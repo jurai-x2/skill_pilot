@@ -121,10 +121,10 @@ export const useAuth = (): AuthState => {
       }
 
       if (data.user) {
-        // Create user profile
+        // Create or update user profile using upsert to handle duplicate keys
         const { error: profileError } = await supabase
           .from('users')
-          .insert({
+          .upsert({
             id: data.user.id,
             email: data.user.email!,
             name: userData.name || '',
@@ -142,7 +142,11 @@ export const useAuth = (): AuthState => {
             portfolio_url: userData.portfolioUrl,
             personality_type: userData.personalityType,
             study_hours: userData.studyHours || 0,
-            weekly_goal: userData.weeklyGoal || 10
+            weekly_goal: userData.weeklyGoal || 10,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'id'
           });
 
         if (profileError) {
