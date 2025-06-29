@@ -3,27 +3,29 @@ import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
 
-interface AuthState {
+export interface AuthState {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  signUp: (email: string, password: string, userData: Partial<User>) => Promise<{ error?: string }>;
+  signIn: (email: string, password: string) => Promise<{ error?: string }>;
+  signOut: () => Promise<void>;
+  updateProfile: (updates: Partial<User>) => Promise<{ error?: string }>;
 }
 
-export const useAuth = () => {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    session: null,
-    loading: true,
-  });
+export const useAuth = (): AuthState => {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setAuthState(prev => ({ ...prev, session }));
+      setSession(session);
       if (session?.user) {
         fetchUserProfile(session.user.id);
       } else {
-        setAuthState(prev => ({ ...prev, loading: false }));
+        setLoading(false);
       }
     });
 
@@ -31,14 +33,12 @@ export const useAuth = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setAuthState(prev => ({ ...prev, session }));
-      
+      setSession(session);
       if (session?.user) {
-        if (event === 'SIGNED_IN') {
-          await fetchUserProfile(session.user.id);
-        }
+        await fetchUserProfile(session.user.id);
       } else {
-        setAuthState({ user: null, session: null, loading: false });
+        setUser(null);
+        setLoading(false);
       }
     });
 
@@ -47,34 +47,37 @@ export const useAuth = () => {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data: userProfile, error } = await supabase
+      const { data, error } = await supabase
         .from('users')
-        .select(`
-          *,
-          certificates (*)
-        `)
+        .select('*')
         .eq('id', userId)
         .single();
 
       if (error) {
         console.error('Error fetching user profile:', error);
-        setAuthState(prev => ({ ...prev, loading: false }));
+        setLoading(false);
         return;
       }
 
-      if (userProfile) {
-        const user: User = {
-          id: userProfile.id,
-          name: userProfile.name,
-          email: userProfile.email,
-          avatar: userProfile.avatar_url,
-          careerPath: userProfile.career_path,
-          level: userProfile.level,
-          xp: userProfile.xp,
-          totalXp: userProfile.total_xp,
-          streak: userProfile.streak,
-          completedLessons: userProfile.completed_lessons,
-          certificates: userProfile.certificates.map((cert: any) => ({
+      if (data) {
+        // Fetch certificates
+        const { data: certificates } = await supabase
+          .from('certificates')
+          .select('*')
+          .eq('user_id', userId);
+
+        const userProfile: User = {
+          id: data.id,
+          name: data.name,
+          email: data.email,
+          avatar: data.avatar_url,
+          careerPath: data.career_path,
+          level: data.level,
+          xp: data.xp,
+          totalXp: data.total_xp,
+          streak: data.streak,
+          completedLessons: data.completed_lessons,
+          certificates: certificates?.map(cert => ({
             id: cert.id,
             name: cert.name,
             careerTrack: cert.career_track,
@@ -83,110 +86,106 @@ export const useAuth = () => {
             uniqueId: cert.unique_id,
             verified: cert.verified,
             skills: cert.skills,
-            grade: cert.grade,
-          })),
-          joinedAt: new Date(userProfile.joined_at),
-          country: userProfile.country,
-          language: userProfile.language,
-          learningStyle: userProfile.learning_style,
-          timeCommitment: userProfile.time_commitment,
-          githubUrl: userProfile.github_url,
-          portfolioUrl: userProfile.portfolio_url,
-          personalityType: userProfile.personality_type,
-          studyHours: userProfile.study_hours,
-          weeklyGoal: userProfile.weekly_goal,
-          squad: userProfile.squad,
-          followers: userProfile.followers,
-          following: userProfile.following,
+            grade: cert.grade
+          })) || [],
+          joinedAt: new Date(data.joined_at),
+          country: data.country,
+          language: data.language,
+          learningStyle: data.learning_style,
+          timeCommitment: data.time_commitment,
+          githubUrl: data.github_url,
+          portfolioUrl: data.portfolio_url,
+          personalityType: data.personality_type,
+          studyHours: data.study_hours,
+          weeklyGoal: data.weekly_goal
         };
 
-        setAuthState({ user, session: authState.session, loading: false });
+        setUser(userProfile);
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
-      setAuthState(prev => ({ ...prev, loading: false }));
+    } finally {
+      setLoading(false);
     }
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, userData: Partial<User>) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            name,
-          },
-        },
       });
 
-      if (error) throw error;
+      if (error) {
+        return { error: error.message };
+      }
 
-      // Create user profile
       if (data.user) {
+        // Create user profile
         const { error: profileError } = await supabase
           .from('users')
           .insert({
             id: data.user.id,
             email: data.user.email!,
-            name,
-            language: 'en',
+            name: userData.name || '',
+            language: userData.language || 'en',
             level: 1,
             xp: 0,
             total_xp: 0,
             streak: 0,
             completed_lessons: 0,
-            study_hours: 0,
-            weekly_goal: 10,
-            followers: 0,
-            following: 0,
+            joined_at: new Date().toISOString(),
+            country: userData.country,
+            learning_style: userData.learningStyle,
+            time_commitment: userData.timeCommitment,
+            github_url: userData.githubUrl,
+            portfolio_url: userData.portfolioUrl,
+            personality_type: userData.personalityType,
+            study_hours: userData.studyHours || 0,
+            weekly_goal: userData.weeklyGoal || 10
           });
 
         if (profileError) {
-          console.error('Error creating user profile:', profileError);
-          throw profileError;
+          return { error: profileError.message };
         }
       }
 
-      return { data, error: null };
+      return {};
     } catch (error) {
-      console.error('Error in signUp:', error);
-      return { data: null, error };
+      return { error: 'An unexpected error occurred' };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
-      return { data, error: null };
+      if (error) {
+        return { error: error.message };
+      }
+
+      return {};
     } catch (error) {
-      console.error('Error in signIn:', error);
-      return { data: null, error };
+      return { error: 'An unexpected error occurred' };
     }
   };
 
   const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error in signOut:', error);
-    }
+    await supabase.auth.signOut();
   };
 
   const updateProfile = async (updates: Partial<User>) => {
-    if (!authState.user) return { error: 'No user logged in' };
+    if (!user) return { error: 'No user logged in' };
 
     try {
       const { error } = await supabase
         .from('users')
         .update({
           name: updates.name,
+          avatar_url: updates.avatar,
           career_path: updates.careerPath,
           country: updates.country,
           language: updates.language,
@@ -195,59 +194,31 @@ export const useAuth = () => {
           github_url: updates.githubUrl,
           portfolio_url: updates.portfolioUrl,
           personality_type: updates.personalityType,
+          study_hours: updates.studyHours,
           weekly_goal: updates.weeklyGoal,
-          updated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
-        .eq('id', authState.user.id);
+        .eq('id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        return { error: error.message };
+      }
 
-      // Refresh user profile
-      await fetchUserProfile(authState.user.id);
-      return { error: null };
+      // Update local user state
+      setUser(prev => prev ? { ...prev, ...updates } : null);
+      return {};
     } catch (error) {
-      console.error('Error updating profile:', error);
-      return { error };
-    }
-  };
-
-  const updateXP = async (xpGained: number) => {
-    if (!authState.user) return { error: 'No user logged in' };
-
-    try {
-      const newXP = authState.user.xp + xpGained;
-      const newTotalXP = authState.user.totalXp + xpGained;
-      const newLevel = Math.floor(newTotalXP / 100) + 1;
-
-      const { error } = await supabase
-        .from('users')
-        .update({
-          xp: newXP,
-          total_xp: newTotalXP,
-          level: newLevel,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', authState.user.id);
-
-      if (error) throw error;
-
-      // Refresh user profile
-      await fetchUserProfile(authState.user.id);
-      return { error: null };
-    } catch (error) {
-      console.error('Error updating XP:', error);
-      return { error };
+      return { error: 'An unexpected error occurred' };
     }
   };
 
   return {
-    user: authState.user,
-    session: authState.session,
-    loading: authState.loading,
+    user,
+    session,
+    loading,
     signUp,
     signIn,
     signOut,
-    updateProfile,
-    updateXP,
+    updateProfile
   };
 };
