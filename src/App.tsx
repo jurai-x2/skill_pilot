@@ -15,7 +15,10 @@ import LiveEvents from './components/LiveEvents';
 import LearningFeed from './components/LearningFeed';
 import Gamification from './components/Gamification';
 import PersonalizedVideos from './components/PersonalizedVideos';
-import { QuizResult, User, Lesson, Project } from './types';
+import AuthModal from './components/Auth/AuthModal';
+import ProtectedRoute from './components/Auth/ProtectedRoute';
+import { useAuth } from './hooks/useAuth';
+import { QuizResult, Lesson, Project } from './types';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -32,41 +35,11 @@ function App() {
   const [showLearningFeed, setShowLearningFeed] = useState(false);
   const [showGamification, setShowGamification] = useState(false);
   const [showPersonalizedVideos, setShowPersonalizedVideos] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [theme, setTheme] = useState<Theme>('system');
   
-  // Mock user data - in real app, this would come from authentication
-  const [user] = useState<User>({
-    id: '1',
-    name: 'Alex Chen',
-    email: 'alex@example.com',
-    careerPath: 'Frontend Developer',
-    level: 3,
-    xp: 150,
-    totalXp: 450,
-    streak: 5,
-    completedLessons: 12,
-    certificates: [
-      {
-        id: '1',
-        name: 'HTML/CSS Fundamentals',
-        careerTrack: 'Frontend Developer',
-        issuedAt: new Date('2024-01-15'),
-        projectUrl: 'https://github.com/alexchen/portfolio',
-        uniqueId: 'CERT-001-2024',
-        verified: true,
-        skills: ['HTML', 'CSS', 'Responsive Design']
-      }
-    ],
-    joinedAt: new Date('2024-01-01'),
-    language: currentLanguage,
-    country: 'United States',
-    githubUrl: 'https://github.com/alexchen',
-    portfolioUrl: 'https://alexchen.dev',
-    personalityType: 'Creative Problem Solver',
-    studyHours: 45,
-    weeklyGoal: 10
-  });
+  const { user, loading, updateXP } = useAuth();
 
   // Theme management
   useEffect(() => {
@@ -174,6 +147,10 @@ function App() {
   };
 
   const handleStartQuiz = () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     setCurrentView('quiz');
   };
 
@@ -183,12 +160,17 @@ function App() {
   };
 
   const handleViewRoadmap = () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     setCurrentView('roadmap');
   };
 
-  const handleLessonComplete = (xpEarned: number) => {
-    // In a real app, this would update user XP and progress
-    console.log(`Lesson completed! Earned ${xpEarned} XP`);
+  const handleLessonComplete = async (xpEarned: number) => {
+    if (user && updateXP) {
+      await updateXP(xpEarned);
+    }
     setShowMicroLearning(false);
   };
 
@@ -198,34 +180,78 @@ function App() {
     setShowProjectSubmission(false);
   };
 
+  const handleViewChange = (view: string) => {
+    // Check if authentication is required for certain views
+    const protectedViews = ['dashboard', 'roadmap'];
+    if (protectedViews.includes(view) && !user) {
+      setShowAuthModal(true);
+      return;
+    }
+    setCurrentView(view);
+  };
+
   const renderCurrentView = () => {
     switch (currentView) {
       case 'home':
         return <LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />;
       case 'quiz':
-        return <CareerQuiz onComplete={handleQuizComplete} currentLanguage={currentLanguage} />;
+        return (
+          <ProtectedRoute>
+            <CareerQuiz onComplete={handleQuizComplete} currentLanguage={currentLanguage} />
+          </ProtectedRoute>
+        );
       case 'results':
         return quizResult ? (
-          <QuizResults 
-            result={quizResult} 
-            onViewRoadmap={handleViewRoadmap}
-            currentLanguage={currentLanguage}
-          />
+          <ProtectedRoute>
+            <QuizResults 
+              result={quizResult} 
+              onViewRoadmap={handleViewRoadmap}
+              currentLanguage={currentLanguage}
+            />
+          </ProtectedRoute>
         ) : null;
       case 'dashboard':
-        return <Dashboard user={user} onViewRoadmap={handleViewRoadmap} currentLanguage={currentLanguage} />;
+        return (
+          <ProtectedRoute>
+            {user && (
+              <Dashboard 
+                user={user} 
+                onViewRoadmap={handleViewRoadmap} 
+                currentLanguage={currentLanguage} 
+              />
+            )}
+          </ProtectedRoute>
+        );
       case 'roadmap':
-        return <Roadmap careerPath={quizResult?.careerPath || user.careerPath || 'Frontend Developer'} currentLanguage={currentLanguage} />;
+        return (
+          <ProtectedRoute>
+            <Roadmap 
+              careerPath={quizResult?.careerPath || user?.careerPath || 'Frontend Developer'} 
+              currentLanguage={currentLanguage} 
+            />
+          </ProtectedRoute>
+        );
       default:
         return <LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />;
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
       <Header 
         currentView={currentView} 
-        onViewChange={setCurrentView}
+        onViewChange={handleViewChange}
         onOpenAIMentor={() => setShowAIMentor(true)}
         onOpenResumeBuilder={() => setShowResumeBuilder(true)}
         onOpenCommunityForum={() => setShowCommunityForum(true)}
@@ -239,6 +265,8 @@ function App() {
         currentTheme={theme}
         onThemeChange={setTheme}
         currentLanguage={currentLanguage}
+        user={user}
+        onOpenAuth={() => setShowAuthModal(true)}
       />
 
       {renderCurrentView()}
@@ -250,7 +278,7 @@ function App() {
         currentLanguage={currentLanguage}
       />
       
-      {showResumeBuilder && (
+      {showResumeBuilder && user && (
         <ResumeBuilder 
           user={user}
           onClose={() => setShowResumeBuilder(false)}
@@ -265,7 +293,7 @@ function App() {
       />
       
       <MonetizationGuide 
-        careerPath={user.careerPath || 'Frontend Developer'}
+        careerPath={user?.careerPath || 'Frontend Developer'}
         isOpen={showMonetizationGuide}
         onClose={() => setShowMonetizationGuide(false)}
         currentLanguage={currentLanguage}
@@ -301,18 +329,27 @@ function App() {
         currentLanguage={currentLanguage}
       />
 
-      <Gamification
-        user={user}
-        isOpen={showGamification}
-        onClose={() => setShowGamification(false)}
-        currentLanguage={currentLanguage}
-      />
+      {user && (
+        <Gamification
+          user={user}
+          isOpen={showGamification}
+          onClose={() => setShowGamification(false)}
+          currentLanguage={currentLanguage}
+        />
+      )}
 
-      <PersonalizedVideos
-        user={user}
-        isOpen={showPersonalizedVideos}
-        onClose={() => setShowPersonalizedVideos(false)}
-        currentLanguage={currentLanguage}
+      {user && (
+        <PersonalizedVideos
+          user={user}
+          isOpen={showPersonalizedVideos}
+          onClose={() => setShowPersonalizedVideos(false)}
+          currentLanguage={currentLanguage}
+        />
+      )}
+
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
       />
     </div>
   );
