@@ -50,13 +50,23 @@ export default function AuthModal({ isOpen, onClose, currentLanguage }: AuthModa
           timeCommitment
         });
         if (error) {
-          setError(error);
+          // Handle specific "User already registered" error
+          if (error.includes('User already registered') || error.includes('user_already_exists')) {
+            setError('This email is already registered. Please sign in instead or use a different email address.');
+          } else {
+            setError(error);
+          }
         } else {
           onClose();
         }
       }
-    } catch (err) {
-      setError('An unexpected error occurred');
+    } catch (err: any) {
+      // Handle network or other errors that might contain the user_already_exists message
+      if (err?.message?.includes('user_already_exists') || err?.message?.includes('User already registered')) {
+        setError('This email is already registered. Please sign in instead or use a different email address.');
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -107,6 +117,15 @@ export default function AuthModal({ isOpen, onClose, currentLanguage }: AuthModa
           {error && (
             <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
               <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+              {error.includes('already registered') && mode === 'signup' && (
+                <button
+                  type="button"
+                  onClick={() => switchMode('signin')}
+                  className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 underline"
+                >
+                  Switch to Sign In
+                </button>
+              )}
             </div>
           )}
 
