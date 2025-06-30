@@ -32,7 +32,7 @@ export const useAuth = () => {
         return;
       }
 
-      const { data: profile, error } = await db
+      const { data: profile, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', supabaseUser.id)
@@ -256,7 +256,7 @@ export const useAuth = () => {
 
       if (data.user) {
         // Create user profile
-        const { error: profileError } = await db
+        const { error: profileError } = await supabase
           .from('users')
           .insert({
             id: data.user.id,
