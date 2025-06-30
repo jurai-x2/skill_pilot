@@ -134,7 +134,7 @@ export default function LandingPage({ onStartQuiz, currentLanguage }: LandingPag
                 </div>
               </div>
               
-              {/* Smaller CTA Buttons with Reduced Padding and Text Size */}
+              {/* CTA Buttons - Updated to trigger signup for Get Started */}
               <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
                 <motion.button
                   onClick={onStartQuiz}
