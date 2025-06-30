@@ -41,7 +41,7 @@ function App() {
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [theme, setTheme] = useState<Theme>('system');
   
-  const { user, loading } = useAuth();
+  const { user, loading, isConfigured } = useAuth();
 
   // Theme management
   useEffect(() => {
@@ -119,28 +119,32 @@ function App() {
   // Load user's latest quiz result
   useEffect(() => {
     const loadQuizResult = async () => {
-      if (user) {
-        const { data } = await db.getQuizResults(user.id);
-        if (data && data.length > 0) {
-          const latestResult = data[0];
-          setQuizResult({
-            careerPath: latestResult.career_path,
-            confidence: latestResult.confidence,
-            description: latestResult.description,
-            skills: latestResult.skills,
-            nextSteps: latestResult.next_steps,
-            personalityType: latestResult.personality_type,
-            learningStyle: latestResult.learning_style,
-            alternativePaths: latestResult.alternative_paths,
-            riasecProfile: latestResult.riasec_profile,
-            bigFiveTraits: latestResult.big_five_traits as Record<string, number>
-          });
+      if (user && isConfigured) {
+        try {
+          const { data } = await db.getQuizResults(user.id);
+          if (data && data.length > 0) {
+            const latestResult = data[0];
+            setQuizResult({
+              careerPath: latestResult.career_path,
+              confidence: latestResult.confidence,
+              description: latestResult.description,
+              skills: latestResult.skills,
+              nextSteps: latestResult.next_steps,
+              personalityType: latestResult.personality_type,
+              learningStyle: latestResult.learning_style,
+              alternativePaths: latestResult.alternative_paths,
+              riasecProfile: latestResult.riasec_profile,
+              bigFiveTraits: latestResult.big_five_traits as Record<string, number>
+            });
+          }
+        } catch (error) {
+          console.error('Error loading quiz results:', error);
         }
       }
     };
 
     loadQuizResult();
-  }, [user]);
+  }, [user, isConfigured]);
 
   // Mock lesson for micro-learning demo
   const mockLesson: Lesson = {
@@ -175,7 +179,7 @@ function App() {
   };
 
   const handleStartQuiz = () => {
-    if (!user) {
+    if (!user && isConfigured) {
       setAuthModalMode('signup');
       setShowAuthModal(true);
       return;
@@ -184,16 +188,20 @@ function App() {
   };
 
   const handleQuizComplete = async (result: QuizResult) => {
-    if (user) {
+    if (user && isConfigured) {
       // Save quiz result to database
-      await db.saveQuizResult(user.id, result);
+      try {
+        await db.saveQuizResult(user.id, result);
+      } catch (error) {
+        console.error('Error saving quiz result:', error);
+      }
     }
     setQuizResult(result);
     setCurrentView('results');
   };
 
   const handleViewRoadmap = () => {
-    if (!user) {
+    if (!user && isConfigured) {
       setAuthModalMode('signin');
       setShowAuthModal(true);
       return;
@@ -203,8 +211,8 @@ function App() {
 
   const handleViewChange = (view: string) => {
     // Check if user needs to be authenticated for protected views
-    const protectedViews = ['dashboard', 'roadmap', 'quiz'];
-    if (protectedViews.includes(view) && !user) {
+    const protectedViews = ['dashboard', 'roadmap'];
+    if (protectedViews.includes(view) && !user && isConfigured) {
       setAuthModalMode('signin');
       setShowAuthModal(true);
       return;
@@ -270,6 +278,11 @@ function App() {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading SkillPilot...</p>
+          {!isConfigured && (
+            <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
+              Running in demo mode - Supabase not configured
+            </p>
+          )}
         </div>
       </div>
     );
@@ -300,11 +313,13 @@ function App() {
       {renderCurrentView()}
       
       {/* Modals and Overlays */}
-      <AuthModal 
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        initialMode={authModalMode}
-      />
+      {isConfigured && (
+        <AuthModal 
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          initialMode={authModalMode}
+        />
+      )}
       
       <AIMentor 
         isOpen={showAIMentor} 

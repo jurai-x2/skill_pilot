@@ -19,24 +19,39 @@ export const useAuth = () => {
   });
 
   useEffect(() => {
-    // Check if Supabase is configured
-    if (!isSupabaseConfigured()) {
-      console.warn('Supabase not configured. Running in demo mode.');
-      setAuthState({
-        user: null,
-        session: null,
-        loading: false,
-        error: null
-      });
-      return;
-    }
+    let mounted = true;
 
-    // Get initial session
-    const getInitialSession = async () => {
+    const initializeAuth = async () => {
       try {
-        const { data: { session }, error } = await auth.getSession();
+        // Check if Supabase is configured
+        if (!isSupabaseConfigured()) {
+          console.warn('Supabase not configured. Running in demo mode.');
+          if (mounted) {
+            setAuthState({
+              user: null,
+              session: null,
+              loading: false,
+              error: null
+            });
+          }
+          return;
+        }
+
+        // Get initial session with timeout
+        const sessionPromise = auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session check timeout')), 5000)
+        );
+
+        const { data: { session }, error } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]) as any;
         
+        if (!mounted) return;
+
         if (error) {
+          console.error('Session error:', error);
           setAuthState(prev => ({ ...prev, error: error.message, loading: false }));
           return;
         }
@@ -48,33 +63,55 @@ export const useAuth = () => {
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
-        setAuthState(prev => ({ 
-          ...prev, 
-          error: error instanceof Error ? error.message : 'Unknown error', 
-          loading: false 
-        }));
+        if (mounted) {
+          setAuthState(prev => ({ 
+            ...prev, 
+            error: error instanceof Error ? error.message : 'Authentication failed', 
+            loading: false 
+          }));
+        }
       }
     };
 
-    getInitialSession();
+    initializeAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          await loadUserProfile(session.user);
-        } else if (event === 'SIGNED_OUT') {
-          setAuthState({
-            user: null,
-            session: null,
-            loading: false,
-            error: null
-          });
+    // Listen for auth changes only if Supabase is configured
+    let subscription: any = null;
+    if (isSupabaseConfigured()) {
+      const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (!mounted) return;
+          
+          try {
+            if (event === 'SIGNED_IN' && session?.user) {
+              await loadUserProfile(session.user);
+            } else if (event === 'SIGNED_OUT') {
+              setAuthState({
+                user: null,
+                session: null,
+                loading: false,
+                error: null
+              });
+            }
+          } catch (error) {
+            console.error('Auth state change error:', error);
+            if (mounted) {
+              setAuthState(prev => ({
+                ...prev,
+                error: error instanceof Error ? error.message : 'Auth state change failed',
+                loading: false
+              }));
+            }
+          }
         }
-      }
-    );
+      );
+      subscription = authSubscription;
+    }
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const loadUserProfile = async (supabaseUser: SupabaseUser) => {
@@ -83,7 +120,31 @@ export const useAuth = () => {
       
       if (error) {
         console.error('Error loading user profile:', error);
-        setAuthState(prev => ({ ...prev, error: error.message, loading: false }));
+        // If user profile doesn't exist, create a mock user for now
+        const mockUser: User = {
+          id: supabaseUser.id,
+          name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+          email: supabaseUser.email || '',
+          level: 1,
+          xp: 0,
+          totalXp: 0,
+          streak: 0,
+          completedLessons: 0,
+          certificates: [],
+          joinedAt: new Date(),
+          language: 'en',
+          studyHours: 0,
+          weeklyGoal: 10,
+          followers: 0,
+          following: 0
+        };
+
+        setAuthState({
+          user: mockUser,
+          session: { user: supabaseUser } as Session,
+          loading: false,
+          error: null
+        });
         return;
       }
 
@@ -123,9 +184,31 @@ export const useAuth = () => {
           error: null
         });
       } else {
-        // User profile doesn't exist, this shouldn't happen with the trigger
-        console.warn('User profile not found for authenticated user');
-        setAuthState(prev => ({ ...prev, loading: false }));
+        // User profile doesn't exist, create a mock user
+        const mockUser: User = {
+          id: supabaseUser.id,
+          name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+          email: supabaseUser.email || '',
+          level: 1,
+          xp: 0,
+          totalXp: 0,
+          streak: 0,
+          completedLessons: 0,
+          certificates: [],
+          joinedAt: new Date(),
+          language: 'en',
+          studyHours: 0,
+          weeklyGoal: 10,
+          followers: 0,
+          following: 0
+        };
+
+        setAuthState({
+          user: mockUser,
+          session: { user: supabaseUser } as Session,
+          loading: false,
+          error: null
+        });
       }
     } catch (error) {
       console.error('Error in loadUserProfile:', error);
