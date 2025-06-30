@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, Eye, EyeOff, Loader, AlertCircle, CheckCircle, Shield } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -27,6 +27,12 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const { signIn, signUp, loading, error } = useAuth();
+
+  // Update mode when initialMode changes
+  useEffect(() => {
+    console.log('🔐 AuthModal initialMode changed to:', initialMode);
+    setMode(initialMode);
+  }, [initialMode]);
 
   const resetForm = () => {
     setFormData({ email: '', password: '', name: '', confirmPassword: '' });
@@ -162,6 +168,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
   };
 
   const switchMode = (newMode: 'signin' | 'signup' | 'forgot') => {
+    console.log('🔐 Switching auth mode to:', newMode);
     setMode(newMode);
     resetForm();
   };
@@ -210,7 +217,9 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
               <div className="flex items-start space-x-3">
                 <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-blue-800 dark:text-blue-200 text-sm font-medium">Authentication Required</p>
+                  <p className="text-blue-800 dark:text-blue-200 text-sm font-medium">
+                    {mode === 'signup' ? 'Get Started' : 'Authentication Required'}
+                  </p>
                   <p className="text-blue-700 dark:text-blue-300 text-sm mt-1">{message}</p>
                 </div>
               </div>

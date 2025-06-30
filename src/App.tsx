@@ -180,12 +180,17 @@ function App() {
   };
 
   const handleStartQuiz = () => {
+    console.log('🎯 handleStartQuiz called, user:', user ? 'authenticated' : 'not authenticated');
+    
     if (!user) {
-      setAuthMessage('Please log in or sign up to take the career quiz and save your results.');
+      console.log('🔐 User not authenticated, showing signup modal');
+      setAuthMessage('Create your free account to take the career quiz and get personalized learning paths!');
       setAuthModalMode('signup');
       setShowAuthModal(true);
       return;
     }
+    
+    console.log('✅ User authenticated, going to quiz');
     setCurrentView('quiz');
   };
 
@@ -233,12 +238,14 @@ function App() {
   };
 
   const openAuthModal = (mode: 'signin' | 'signup', message?: string) => {
+    console.log('🔐 Opening auth modal with mode:', mode);
     setAuthModalMode(mode);
     setAuthMessage(message || '');
     setShowAuthModal(true);
   };
 
   const closeAuthModal = () => {
+    console.log('🔐 Closing auth modal');
     setShowAuthModal(false);
     setAuthMessage('');
   };
