@@ -581,6 +581,28 @@ export const db = {
     }
   },
 
+  deleteUserRoadmap: async (userId: string) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Database not available' } };
+    }
+    
+    try {
+      console.log('📊 Deleting roadmap stages for:', userId);
+      
+      const deletePromise = supabase
+        .from('roadmap_stages')
+        .delete()
+        .eq('user_id', userId);
+
+      const timeoutPromise = createTimeoutPromise(4000, 'Delete roadmap stages');
+      const { data, error } = await Promise.race([deletePromise, timeoutPromise]) as any;
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Delete roadmap stages error:', err);
+      return { data: null, error: { message: 'Network error deleting roadmap stages' } };
+    }
+  },
+
   updateStageProgress: async (stageId: string, completed: boolean) => {
     if (!supabase) {
       return { data: null, error: { message: 'Database not available' } };

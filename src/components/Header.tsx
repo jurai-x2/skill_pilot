@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, User, Menu, X, MessageCircle, FileText, Users, DollarSign, BookOpen, Upload, Calendar, Play, Trophy, Video, ChevronDown, Sparkles, Zap, Globe, LogOut, Settings, Award } from 'lucide-react';
+import { Brain, User, Menu, X, MessageCircle, FileText, Users, DollarSign, BookOpen, Upload, Calendar, Play, Trophy, Video, ChevronDown, Sparkles, Zap, Globe, LogOut, Settings, Award, UserCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSelector from './LanguageSelector';
@@ -23,6 +23,7 @@ interface HeaderProps {
   onOpenGamification: () => void;
   onOpenPersonalizedVideos: () => void;
   onOpenCertificates: () => void;
+  onOpenProfile: () => void;
   currentTheme: Theme;
   onThemeChange: (theme: Theme) => void;
   currentLanguage: string;
@@ -44,6 +45,7 @@ export default function Header({
   onOpenGamification,
   onOpenPersonalizedVideos,
   onOpenCertificates,
+  onOpenProfile,
   currentTheme,
   onThemeChange,
   currentLanguage,
@@ -379,6 +381,17 @@ export default function Header({
                         
                         <div className="p-2">
                           <button
+                            onClick={() => {
+                              onOpenProfile();
+                              setShowUserMenu(false);
+                            }}
+                            className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <UserCircle className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                            <span className="text-gray-700 dark:text-gray-300">View Profile</span>
+                          </button>
+                          
+                          <button
                             onClick={handleSignOut}
                             className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
                           >
@@ -598,6 +611,20 @@ export default function Header({
                             <div className="text-sm text-gray-600 dark:text-gray-400">{user.email}</div>
                           </div>
                         </div>
+                        
+                        <motion.button 
+                          onClick={() => {
+                            onOpenProfile();
+                            setIsMenuOpen(false);
+                          }}
+                          className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-all duration-300"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <UserCircle className="w-5 h-5" />
+                          <span className="font-semibold">View Profile</span>
+                        </motion.button>
+                        
                         <motion.button 
                           onClick={handleSignOut}
                           className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-300"
