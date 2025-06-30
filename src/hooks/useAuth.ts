@@ -37,10 +37,10 @@ export const useAuth = () => {
           return;
         }
 
-        // Get initial session with timeout
+        // Get initial session with increased timeout
         const sessionPromise = auth.getSession();
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session check timeout')), 5000)
+          setTimeout(() => reject(new Error('Session check timeout')), 10000)
         );
 
         const { data: { session }, error } = await Promise.race([
