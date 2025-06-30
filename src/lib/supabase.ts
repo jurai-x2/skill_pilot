@@ -4,19 +4,28 @@ import { Database } from '../types/database';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+console.log('🔧 Supabase Environment Check:', {
+  url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'MISSING',
+  key: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'MISSING',
+  urlType: typeof supabaseUrl,
+  keyType: typeof supabaseAnonKey
+});
+
 // Check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
-  const isConfigured = !!(supabaseUrl && 
-    supabaseAnonKey && 
-    supabaseUrl !== 'your-project-url' && 
-    supabaseAnonKey !== 'your-anon-key' &&
-    supabaseUrl.includes('supabase.co'));
+  const hasUrl = !!supabaseUrl && supabaseUrl !== 'your-project-url' && supabaseUrl.length > 10;
+  const hasKey = !!supabaseAnonKey && supabaseAnonKey !== 'your-anon-key' && supabaseAnonKey.length > 10;
+  const urlValid = hasUrl && supabaseUrl.includes('supabase.co');
   
-  console.log('Supabase configuration check:', {
-    hasUrl: !!supabaseUrl,
-    hasKey: !!supabaseAnonKey,
-    urlValid: supabaseUrl?.includes('supabase.co'),
-    isConfigured
+  const isConfigured = hasUrl && hasKey && urlValid;
+  
+  console.log('🔍 Supabase Configuration Status:', {
+    hasUrl,
+    hasKey,
+    urlValid,
+    isConfigured,
+    actualUrl: supabaseUrl,
+    actualKey: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 10)}...` : 'undefined'
   });
   
   return isConfigured;
@@ -27,6 +36,7 @@ let supabase: any = null;
 
 if (isSupabaseConfigured()) {
   try {
+    console.log('✅ Creating Supabase client...');
     supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
@@ -34,24 +44,26 @@ if (isSupabaseConfigured()) {
         detectSessionInUrl: true
       }
     });
-    console.log('Supabase client created successfully');
+    console.log('✅ Supabase client created successfully');
   } catch (error) {
-    console.error('Failed to create Supabase client:', error);
+    console.error('❌ Failed to create Supabase client:', error);
   }
 } else {
-  console.warn('Supabase not configured - client not created');
+  console.warn('⚠️ Supabase not configured - running in demo mode');
 }
 
 export { supabase };
 
-// Auth helpers
+// Auth helpers with better error handling
 export const auth = {
   signUp: async (email: string, password: string, userData?: any) => {
     if (!supabase) {
-      throw new Error('Supabase not configured');
+      console.error('❌ Auth Error: Supabase not configured');
+      throw new Error('Authentication service not available');
     }
     
     try {
+      console.log('🔐 Attempting sign up for:', email);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -59,130 +71,158 @@ export const auth = {
           data: userData
         }
       });
+      
+      if (error) {
+        console.error('❌ Sign up error:', error);
+      } else {
+        console.log('✅ Sign up successful');
+      }
+      
       return { data, error };
     } catch (err) {
-      console.error('Sign up network error:', err);
+      console.error('❌ Sign up network error:', err);
       return { data: null, error: { message: 'Network error during sign up' } };
     }
   },
 
   signIn: async (email: string, password: string) => {
     if (!supabase) {
-      throw new Error('Supabase not configured');
+      console.error('❌ Auth Error: Supabase not configured');
+      throw new Error('Authentication service not available');
     }
     
     try {
+      console.log('🔐 Attempting sign in for:', email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
+      
+      if (error) {
+        console.error('❌ Sign in error:', error);
+      } else {
+        console.log('✅ Sign in successful');
+      }
+      
       return { data, error };
     } catch (err) {
-      console.error('Sign in network error:', err);
+      console.error('❌ Sign in network error:', err);
       return { data: null, error: { message: 'Network error during sign in' } };
     }
   },
 
   signOut: async () => {
     if (!supabase) {
+      console.log('⚠️ Sign out: Supabase not configured');
       return { error: null };
     }
     
     try {
+      console.log('🔐 Signing out...');
       const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('❌ Sign out error:', error);
+      } else {
+        console.log('✅ Sign out successful');
+      }
+      
       return { error };
     } catch (err) {
-      console.error('Sign out network error:', err);
+      console.error('❌ Sign out network error:', err);
       return { error: { message: 'Network error during sign out' } };
     }
   },
 
   resetPassword: async (email: string) => {
     if (!supabase) {
-      throw new Error('Supabase not configured');
+      throw new Error('Authentication service not available');
     }
     
     try {
+      console.log('🔐 Sending password reset for:', email);
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`
       });
       return { data, error };
     } catch (err) {
-      console.error('Password reset network error:', err);
+      console.error('❌ Password reset network error:', err);
       return { data: null, error: { message: 'Network error during password reset' } };
     }
   },
 
-  updatePassword: async (password: string) => {
+  getCurrentUser: async () => {
     if (!supabase) {
-      throw new Error('Supabase not configured');
+      console.log('⚠️ Get user: Supabase not configured');
+      return { data: { user: null }, error: null };
     }
     
     try {
-      const { data, error } = await supabase.auth.updateUser({
-        password
-      });
-      return { data, error };
+      console.log('👤 Getting current user...');
+      const result = await supabase.auth.getUser();
+      console.log('👤 Current user result:', result.data.user ? 'Found user' : 'No user');
+      return result;
     } catch (err) {
-      console.error('Password update network error:', err);
-      return { data: null, error: { message: 'Network error during password update' } };
+      console.error('❌ Get user error:', err);
+      return { data: { user: null }, error: { message: 'Failed to get current user' } };
     }
   },
 
-  getCurrentUser: () => {
+  getSession: async () => {
     if (!supabase) {
-      return Promise.resolve({ data: { user: null }, error: { message: 'Supabase not configured' } });
+      console.log('⚠️ Get session: Supabase not configured');
+      return { data: { session: null }, error: null };
     }
     
     try {
-      return supabase.auth.getUser();
+      console.log('🔑 Getting current session...');
+      const result = await supabase.auth.getSession();
+      console.log('🔑 Session result:', result.data.session ? 'Found session' : 'No session');
+      return result;
     } catch (err) {
-      console.error('Get user error:', err);
-      return Promise.resolve({ data: { user: null }, error: { message: 'Failed to get current user' } });
-    }
-  },
-
-  getSession: () => {
-    if (!supabase) {
-      return Promise.resolve({ data: { session: null }, error: { message: 'Supabase not configured' } });
-    }
-    
-    try {
-      return supabase.auth.getSession();
-    } catch (err) {
-      console.error('Get session error:', err);
-      return Promise.resolve({ data: { session: null }, error: { message: 'Failed to get session' } });
+      console.error('❌ Get session error:', err);
+      return { data: { session: null }, error: { message: 'Failed to get session' } };
     }
   }
 };
 
-// Database helpers
+// Database helpers with better error handling
 export const db = {
   // Users
   getUser: async (id: string) => {
     if (!supabase) {
-      return { data: null, error: { message: 'Supabase not configured' } };
+      console.log('⚠️ DB: Supabase not configured');
+      return { data: null, error: { message: 'Database not available' } };
     }
     
     try {
+      console.log('📊 Getting user profile for:', id);
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', id)
         .single();
+      
+      if (error) {
+        console.error('❌ Get user error:', error);
+      } else {
+        console.log('✅ User profile loaded');
+      }
+      
       return { data, error };
     } catch (err) {
-      console.error('Get user error:', err);
+      console.error('❌ Get user network error:', err);
       return { data: null, error: { message: 'Network error fetching user' } };
     }
   },
 
   updateUser: async (id: string, updates: any) => {
     if (!supabase) {
-      return { data: null, error: { message: 'Supabase not configured' } };
+      return { data: null, error: { message: 'Database not available' } };
     }
     
     try {
+      console.log('📊 Updating user:', id);
       const { data, error } = await supabase
         .from('users')
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -191,7 +231,7 @@ export const db = {
         .single();
       return { data, error };
     } catch (err) {
-      console.error('Update user error:', err);
+      console.error('❌ Update user error:', err);
       return { data: null, error: { message: 'Network error updating user' } };
     }
   },
@@ -199,10 +239,11 @@ export const db = {
   // Quiz Results
   saveQuizResult: async (userId: string, result: any) => {
     if (!supabase) {
-      return { data: null, error: { message: 'Supabase not configured' } };
+      return { data: null, error: { message: 'Database not available' } };
     }
     
     try {
+      console.log('📊 Saving quiz result for:', userId);
       const { data, error } = await supabase
         .from('quiz_results')
         .insert({
@@ -222,17 +263,18 @@ export const db = {
         .single();
       return { data, error };
     } catch (err) {
-      console.error('Save quiz result error:', err);
+      console.error('❌ Save quiz result error:', err);
       return { data: null, error: { message: 'Network error saving quiz result' } };
     }
   },
 
   getQuizResults: async (userId: string) => {
     if (!supabase) {
-      return { data: [], error: { message: 'Supabase not configured' } };
+      return { data: [], error: { message: 'Database not available' } };
     }
     
     try {
+      console.log('📊 Getting quiz results for:', userId);
       const { data, error } = await supabase
         .from('quiz_results')
         .select('*')
@@ -240,197 +282,8 @@ export const db = {
         .order('created_at', { ascending: false });
       return { data, error };
     } catch (err) {
-      console.error('Get quiz results error:', err);
+      console.error('❌ Get quiz results error:', err);
       return { data: [], error: { message: 'Network error fetching quiz results' } };
-    }
-  },
-
-  // Roadmap
-  getRoadmapStages: async (userId: string) => {
-    if (!supabase) {
-      return { data: [], error: { message: 'Supabase not configured' } };
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('roadmap_stages')
-        .select(`
-          *,
-          lessons(*),
-          projects(*)
-        `)
-        .eq('user_id', userId)
-        .order('order_index');
-      return { data, error };
-    } catch (err) {
-      console.error('Get roadmap error:', err);
-      return { data: [], error: { message: 'Network error fetching roadmap' } };
-    }
-  },
-
-  updateStageProgress: async (stageId: string, completed: boolean) => {
-    if (!supabase) {
-      return { data: null, error: { message: 'Supabase not configured' } };
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('roadmap_stages')
-        .update({ completed })
-        .eq('id', stageId)
-        .select()
-        .single();
-      return { data, error };
-    } catch (err) {
-      console.error('Update stage error:', err);
-      return { data: null, error: { message: 'Network error updating stage' } };
-    }
-  },
-
-  updateLessonProgress: async (lessonId: string, completed: boolean) => {
-    if (!supabase) {
-      return { data: null, error: { message: 'Supabase not configured' } };
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('lessons')
-        .update({ completed })
-        .eq('id', lessonId)
-        .select()
-        .single();
-      return { data, error };
-    } catch (err) {
-      console.error('Update lesson error:', err);
-      return { data: null, error: { message: 'Network error updating lesson' } };
-    }
-  },
-
-  updateProjectProgress: async (projectId: string, completed: boolean) => {
-    if (!supabase) {
-      return { data: null, error: { message: 'Supabase not configured' } };
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .update({ completed })
-        .eq('id', projectId)
-        .select()
-        .single();
-      return { data, error };
-    } catch (err) {
-      console.error('Update project error:', err);
-      return { data: null, error: { message: 'Network error updating project' } };
-    }
-  },
-
-  // Forum
-  getForumPosts: async (careerTrack?: string) => {
-    if (!supabase) {
-      return { data: [], error: { message: 'Supabase not configured' } };
-    }
-    
-    try {
-      let query = supabase
-        .from('forum_posts')
-        .select(`
-          *,
-          users(name, avatar_url, career_path),
-          forum_replies(count)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (careerTrack && careerTrack !== 'all') {
-        query = query.eq('career_track', careerTrack);
-      }
-
-      const { data, error } = await query;
-      return { data, error };
-    } catch (err) {
-      console.error('Get forum posts error:', err);
-      return { data: [], error: { message: 'Network error fetching forum posts' } };
-    }
-  },
-
-  createForumPost: async (userId: string, post: any) => {
-    if (!supabase) {
-      return { data: null, error: { message: 'Supabase not configured' } };
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('forum_posts')
-        .insert({
-          user_id: userId,
-          ...post
-        })
-        .select()
-        .single();
-      return { data, error };
-    } catch (err) {
-      console.error('Create forum post error:', err);
-      return { data: null, error: { message: 'Network error creating forum post' } };
-    }
-  },
-
-  // Achievements
-  getUserAchievements: async (userId: string) => {
-    if (!supabase) {
-      return { data: [], error: { message: 'Supabase not configured' } };
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('achievements')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-      return { data, error };
-    } catch (err) {
-      console.error('Get achievements error:', err);
-      return { data: [], error: { message: 'Network error fetching achievements' } };
-    }
-  },
-
-  awardAchievement: async (userId: string, achievement: any) => {
-    if (!supabase) {
-      return { data: null, error: { message: 'Supabase not configured' } };
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('achievements')
-        .insert({
-          user_id: userId,
-          ...achievement,
-          earned: true,
-          earned_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-      return { data, error };
-    } catch (err) {
-      console.error('Award achievement error:', err);
-      return { data: null, error: { message: 'Network error awarding achievement' } };
-    }
-  },
-
-  // Live Events
-  getLiveEvents: async () => {
-    if (!supabase) {
-      return { data: [], error: { message: 'Supabase not configured' } };
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('live_events')
-        .select('*')
-        .order('start_time');
-      return { data, error };
-    } catch (err) {
-      console.error('Get live events error:', err);
-      return { data: [], error: { message: 'Network error fetching live events' } };
     }
   }
 };

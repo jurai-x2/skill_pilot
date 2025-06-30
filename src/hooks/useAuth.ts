@@ -20,10 +20,48 @@ export const useAuth = () => {
 
   const loadUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
-      console.log('Loading user profile for:', supabaseUser.email);
+      console.log('👤 Loading user profile for:', supabaseUser.email);
       
       if (!isSupabaseConfigured() || !supabase) {
-        throw new Error('Supabase not configured');
+        console.log('⚠️ Supabase not configured, creating mock user');
+        // Create a mock user for demo purposes
+        const mockUser: User = {
+          id: supabaseUser.id,
+          name: supabaseUser.user_metadata?.name || supabaseUser.user_metadata?.full_name || 'Demo User',
+          email: supabaseUser.email || 'demo@example.com',
+          avatar_url: supabaseUser.user_metadata?.avatar_url || null,
+          careerPath: null,
+          level: 1,
+          xp: 0,
+          total_xp: 0,
+          streak: 0,
+          completed_lessons: 0,
+          certificates: [],
+          joined_at: new Date().toISOString(),
+          country: null,
+          language: 'en',
+          learning_style: null,
+          time_commitment: null,
+          github_url: null,
+          portfolio_url: null,
+          personality_type: null,
+          study_hours: 0,
+          weekly_goal: 10,
+          squad: null,
+          followers: 0,
+          following: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        setAuthState(prev => ({
+          ...prev,
+          user: mockUser,
+          session: { user: supabaseUser } as Session,
+          loading: false,
+          error: null
+        }));
+        return;
       }
 
       const { data: profile, error } = await supabase
@@ -33,13 +71,13 @@ export const useAuth = () => {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Profile fetch error:', error);
+        console.error('❌ Profile fetch error:', error);
         throw error;
       }
 
       // If no profile exists, create one
       if (!profile) {
-        console.log('Creating new user profile...');
+        console.log('📝 Creating new user profile...');
         const newProfile = {
           id: supabaseUser.id,
           email: supabaseUser.email || '',
@@ -75,7 +113,7 @@ export const useAuth = () => {
           .single();
 
         if (createError) {
-          console.error('Profile creation error:', createError);
+          console.error('❌ Profile creation error:', createError);
           throw createError;
         }
 
@@ -84,7 +122,7 @@ export const useAuth = () => {
           certificates: []
         };
 
-        console.log('User profile created successfully');
+        console.log('✅ User profile created successfully');
         setAuthState(prev => ({
           ...prev,
           user,
@@ -100,7 +138,7 @@ export const useAuth = () => {
         certificates: []
       };
 
-      console.log('User profile loaded successfully');
+      console.log('✅ User profile loaded successfully');
       setAuthState(prev => ({
         ...prev,
         user,
@@ -109,7 +147,7 @@ export const useAuth = () => {
         error: null
       }));
     } catch (error: any) {
-      console.error('Load profile error:', error);
+      console.error('❌ Load profile error:', error);
       setAuthState(prev => ({
         ...prev,
         error: error.message || 'Failed to load user profile',
@@ -123,32 +161,47 @@ export const useAuth = () => {
 
     const initializeAuth = async () => {
       try {
-        console.log('Initializing authentication...');
+        console.log('🚀 Initializing authentication...');
         
+        // Always set loading to false after a timeout to prevent infinite loading
+        const timeoutId = setTimeout(() => {
+          if (mounted) {
+            console.log('⏰ Auth initialization timeout - setting loading to false');
+            setAuthState(prev => ({ ...prev, loading: false }));
+          }
+        }, 5000);
+
         if (!isSupabaseConfigured()) {
-          throw new Error('Supabase not configured. Please set up your environment variables.');
+          console.log('⚠️ Supabase not configured - running in demo mode');
+          clearTimeout(timeoutId);
+          if (mounted) {
+            setAuthState(prev => ({ ...prev, loading: false, error: null }));
+          }
+          return;
         }
 
-        console.log('Getting current session...');
+        console.log('🔑 Getting current session...');
         const { data: { session }, error } = await auth.getSession();
 
+        clearTimeout(timeoutId);
+        
         if (!mounted) return;
 
         if (error) {
-          console.error('Session error:', error);
+          console.error('❌ Session error:', error);
           setAuthState(prev => ({ ...prev, error: error.message, loading: false }));
           return;
         }
 
         if (session?.user) {
-          console.log('Found existing session for:', session.user.email);
+          console.log('✅ Found existing session for:', session.user.email);
           await loadUserProfile(session.user);
         } else {
-          console.log('No existing session found');
+          console.log('ℹ️ No existing session found');
           setAuthState(prev => ({ ...prev, loading: false }));
         }
       } catch (error: any) {
-        console.error('Auth initialization error:', error);
+        console.error('❌ Auth initialization error:', error);
         if (mounted) {
           setAuthState(prev => ({
             ...prev,
@@ -169,7 +222,7 @@ export const useAuth = () => {
         const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
           if (!mounted) return;
 
-          console.log('Auth state change:', event, session?.user?.email);
+          console.log('🔄 Auth state change:', event, session?.user?.email || 'no user');
 
           if (event === 'SIGNED_IN' && session?.user) {
             await loadUserProfile(session.user);
@@ -189,7 +242,7 @@ export const useAuth = () => {
         
         subscription = authSubscription;
       } catch (error: any) {
-        console.error('Auth state change listener error:', error);
+        console.error('❌ Auth state change listener error:', error);
       }
     }
 
@@ -203,10 +256,10 @@ export const useAuth = () => {
 
   const signIn = async (email: string, password: string) => {
     if (!isSupabaseConfigured()) {
-      throw new Error('Supabase not configured');
+      throw new Error('Authentication service not available');
     }
 
-    console.log('Attempting to sign in:', email);
+    console.log('🔐 Attempting to sign in:', email);
     setAuthState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
@@ -220,7 +273,7 @@ export const useAuth = () => {
 
       return { success: true, data, error: null };
     } catch (error: any) {
-      console.error('Sign in error:', error);
+      console.error('❌ Sign in error:', error);
       setAuthState(prev => ({
         ...prev,
         error: error.message,
@@ -232,10 +285,10 @@ export const useAuth = () => {
 
   const signUp = async (email: string, password: string, userData: { name: string }) => {
     if (!isSupabaseConfigured()) {
-      throw new Error('Supabase not configured');
+      throw new Error('Authentication service not available');
     }
 
-    console.log('Attempting to sign up:', email);
+    console.log('📝 Attempting to sign up:', email);
     setAuthState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
@@ -248,7 +301,7 @@ export const useAuth = () => {
 
       return { success: true, data, error: null };
     } catch (error: any) {
-      console.error('Sign up error:', error);
+      console.error('❌ Sign up error:', error);
       setAuthState(prev => ({
         ...prev,
         error: error.message,
@@ -259,19 +312,8 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
-    console.log('Signing out...');
+    console.log('🚪 Signing out...');
     
-    if (!isSupabaseConfigured()) {
-      setAuthState(prev => ({
-        ...prev,
-        user: null,
-        session: null,
-        loading: false,
-        error: null
-      }));
-      return;
-    }
-
     try {
       const { error } = await auth.signOut();
       if (error) throw error;
@@ -284,7 +326,7 @@ export const useAuth = () => {
         error: null
       }));
     } catch (error: any) {
-      console.error('Sign out error:', error);
+      console.error('❌ Sign out error:', error);
       setAuthState(prev => ({
         ...prev,
         error: error.message
@@ -293,8 +335,17 @@ export const useAuth = () => {
   };
 
   const updateProfile = async (updates: Partial<User>) => {
-    if (!authState.user || !isSupabaseConfigured()) {
-      throw new Error('User not authenticated or Supabase not configured');
+    if (!authState.user) {
+      throw new Error('User not authenticated');
+    }
+
+    if (!isSupabaseConfigured()) {
+      // For demo mode, just update local state
+      setAuthState(prev => ({
+        ...prev,
+        user: { ...prev.user!, ...updates }
+      }));
+      return { success: true, data: { ...authState.user, ...updates }, error: null };
     }
 
     try {

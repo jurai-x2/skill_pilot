@@ -44,9 +44,16 @@ function App() {
   
   const { user, loading, error: authError, isConfigured } = useAuth();
 
+  console.log('🎯 App State:', {
+    user: user ? `${user.name} (${user.email})` : 'No user',
+    loading,
+    authError,
+    isConfigured,
+    currentView
+  });
+
   // Theme management
   useEffect(() => {
-    // Load saved theme preference
     const savedTheme = localStorage.getItem('theme') as Theme;
     if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
       setTheme(savedTheme);
@@ -68,7 +75,6 @@ function App() {
       }
     };
 
-    // Apply theme
     if (theme === 'dark') {
       applyTheme(true);
     } else if (theme === 'light') {
@@ -78,11 +84,8 @@ function App() {
       applyTheme(systemPrefersDark);
     }
 
-    // Listen for system theme changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     mediaQuery.addEventListener('change', handleSystemThemeChange);
-
-    // Save theme preference
     localStorage.setItem('theme', theme);
 
     return () => {
@@ -92,7 +95,6 @@ function App() {
 
   // Language management
   useEffect(() => {
-    // Load saved language preference
     const savedLanguage = localStorage.getItem('language');
     if (savedLanguage) {
       setCurrentLanguage(savedLanguage);
@@ -100,11 +102,9 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Save language preference
     localStorage.setItem('language', currentLanguage);
   }, [currentLanguage]);
 
-  // Listen for language change events from header
   useEffect(() => {
     const handleLanguageChange = (event: CustomEvent) => {
       setCurrentLanguage(event.detail);
@@ -139,63 +139,13 @@ function App() {
             });
           }
         } catch (error) {
-          console.error('Error loading quiz results:', error);
+          console.error('❌ Error loading quiz results:', error);
         }
       }
     };
 
     loadQuizResult();
   }, [user, isConfigured]);
-
-  // Session timeout management
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    let warningTimeoutId: NodeJS.Timeout;
-
-    const resetTimeout = () => {
-      clearTimeout(timeoutId);
-      clearTimeout(warningTimeoutId);
-      
-      if (user) {
-        // Warn user 5 minutes before timeout
-        warningTimeoutId = setTimeout(() => {
-          const shouldContinue = confirm(
-            'Your session will expire in 5 minutes due to inactivity. Click OK to continue your session.'
-          );
-          if (!shouldContinue) {
-            // User chose to logout
-            window.location.reload();
-          }
-        }, 25 * 60 * 1000); // 25 minutes
-
-        // Auto logout after 30 minutes of inactivity
-        timeoutId = setTimeout(() => {
-          alert('Your session has expired due to inactivity. Please sign in again.');
-          window.location.reload();
-        }, 30 * 60 * 1000); // 30 minutes
-      }
-    };
-
-    const handleActivity = () => {
-      resetTimeout();
-    };
-
-    // Set up activity listeners
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    events.forEach(event => {
-      document.addEventListener(event, handleActivity, true);
-    });
-
-    resetTimeout();
-
-    return () => {
-      clearTimeout(timeoutId);
-      clearTimeout(warningTimeoutId);
-      events.forEach(event => {
-        document.removeEventListener(event, handleActivity, true);
-      });
-    };
-  }, [user]);
 
   // Mock lesson for micro-learning demo
   const mockLesson: Lesson = {
@@ -241,11 +191,10 @@ function App() {
 
   const handleQuizComplete = async (result: QuizResult) => {
     if (user && isConfigured) {
-      // Save quiz result to database
       try {
         await db.saveQuizResult(user.id, result);
       } catch (error) {
-        console.error('Error saving quiz result:', error);
+        console.error('❌ Error saving quiz result:', error);
       }
     }
     setQuizResult(result);
@@ -263,7 +212,6 @@ function App() {
   };
 
   const handleViewChange = (view: string) => {
-    // Check if user needs to be authenticated for protected views
     const protectedViews = ['dashboard', 'roadmap'];
     if (protectedViews.includes(view) && !user) {
       setAuthMessage('Please sign in to access this feature.');
@@ -275,13 +223,11 @@ function App() {
   };
 
   const handleLessonComplete = (xpEarned: number) => {
-    // In a real app, this would update user XP and progress
     console.log(`Lesson completed! Earned ${xpEarned} XP`);
     setShowMicroLearning(false);
   };
 
   const handleProjectSubmit = (submission: any) => {
-    // In a real app, this would submit to backend
     console.log('Project submitted:', submission);
     setShowProjectSubmission(false);
   };
@@ -355,62 +301,29 @@ function App() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Configuration Error</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Authentication Error</h2>
           <p className="text-gray-600 dark:text-gray-400 mb-6">{authError}</p>
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-left">
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">To fix this:</h3>
-            <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-              <li>1. Create a Supabase project at <a href="https://supabase.com" className="text-primary-600 hover:underline">supabase.com</a></li>
-              <li>2. Copy your project URL and anon key</li>
-              <li>3. Add them to your .env file as:</li>
-              <li className="font-mono text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded mt-2">
-                VITE_SUPABASE_URL=your-project-url<br/>
-                VITE_SUPABASE_ANON_KEY=your-anon-key
-              </li>
-            </ol>
-          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
   }
 
-  // Show configuration error if Supabase is not configured
-  if (!isConfigured) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Supabase Configuration Required</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">Please configure your Supabase environment variables to use authentication features.</p>
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-left">
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Setup Instructions:</h3>
-            <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-              <li>1. Create a Supabase project at <a href="https://supabase.com" className="text-primary-600 hover:underline" target="_blank" rel="noopener noreferrer">supabase.com</a></li>
-              <li>2. Go to Settings → API in your project</li>
-              <li>3. Copy your Project URL and anon public key</li>
-              <li>4. Update your .env file with:</li>
-              <li className="font-mono text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded mt-2">
-                VITE_SUPABASE_URL=https://your-project.supabase.co<br/>
-                VITE_SUPABASE_ANON_KEY=your-anon-key-here
-              </li>
-              <li>5. Restart your development server</li>
-            </ol>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Show loading screen
   if (loading) {
     return (
       <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading SkillPilot...</p>
+          <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+            {isConfigured ? 'Checking authentication...' : 'Starting in demo mode...'}
+          </p>
         </div>
       </div>
     );
