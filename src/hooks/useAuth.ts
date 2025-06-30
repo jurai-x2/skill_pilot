@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
-import { supabase, auth, db } from '../lib/supabase';
+import { supabase, auth, db, isSupabaseConfigured } from '../lib/supabase';
 import { User } from '../types';
 
 interface AuthState {
@@ -19,6 +19,18 @@ export const useAuth = () => {
   });
 
   useEffect(() => {
+    // Check if Supabase is configured
+    if (!isSupabaseConfigured()) {
+      console.warn('Supabase not configured. Running in demo mode.');
+      setAuthState({
+        user: null,
+        session: null,
+        loading: false,
+        error: null
+      });
+      return;
+    }
+
     // Get initial session
     const getInitialSession = async () => {
       try {
@@ -35,6 +47,7 @@ export const useAuth = () => {
           setAuthState(prev => ({ ...prev, loading: false }));
         }
       } catch (error) {
+        console.error('Auth initialization error:', error);
         setAuthState(prev => ({ 
           ...prev, 
           error: error instanceof Error ? error.message : 'Unknown error', 
@@ -69,6 +82,7 @@ export const useAuth = () => {
       const { data: userProfile, error } = await db.getUser(supabaseUser.id);
       
       if (error) {
+        console.error('Error loading user profile:', error);
         setAuthState(prev => ({ ...prev, error: error.message, loading: false }));
         return;
       }
@@ -108,8 +122,13 @@ export const useAuth = () => {
           loading: false,
           error: null
         });
+      } else {
+        // User profile doesn't exist, this shouldn't happen with the trigger
+        console.warn('User profile not found for authenticated user');
+        setAuthState(prev => ({ ...prev, loading: false }));
       }
     } catch (error) {
+      console.error('Error in loadUserProfile:', error);
       setAuthState(prev => ({ 
         ...prev, 
         error: error instanceof Error ? error.message : 'Failed to load user profile', 
@@ -222,6 +241,7 @@ export const useAuth = () => {
     signUp,
     signIn,
     signOut,
-    updateProfile
+    updateProfile,
+    isConfigured: isSupabaseConfigured()
   };
 };
