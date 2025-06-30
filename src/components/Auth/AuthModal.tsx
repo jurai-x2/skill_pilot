@@ -98,6 +98,18 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
             onClose();
             resetForm();
           }, 1500);
+        } else {
+          // Handle specific sign-in errors
+          let errorMessage = result.error?.message || 'An error occurred during sign in.';
+          
+          if (errorMessage.includes('Invalid login credentials')) {
+            errorMessage = 'Invalid email or password. Please check your credentials or use "Forgot password?".';
+          }
+          
+          setSubmissionStatus({
+            type: 'error',
+            message: errorMessage
+          });
         }
       } else if (mode === 'signup') {
         const result = await signUp(formData.email, formData.password, {
@@ -109,6 +121,18 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
             message: 'Account created successfully! Please check your email for a verification link before signing in.'
           });
           // Don't auto-close for signup - let user read the verification message
+        } else {
+          // Handle specific sign-up errors
+          let errorMessage = result.error?.message || 'An error occurred during sign up.';
+          
+          if (errorMessage.includes('User already registered') || errorMessage.includes('user_already_exists')) {
+            errorMessage = 'This email is already registered. Please sign in instead.';
+          }
+          
+          setSubmissionStatus({
+            type: 'error',
+            message: errorMessage
+          });
         }
       } else if (mode === 'forgot') {
         const { error } = await auth.resetPassword(formData.email);
