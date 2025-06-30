@@ -17,8 +17,8 @@ import Gamification from './components/Gamification';
 import PersonalizedVideos from './components/PersonalizedVideos';
 import AuthModal from './components/Auth/AuthModal';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
-import { QuizResult, Lesson, Project } from './types';
 import { useAuth } from './hooks/useAuth';
+import { QuizResult, Lesson, Project } from './types';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -39,7 +39,7 @@ function App() {
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [theme, setTheme] = useState<Theme>('system');
   
-  const { user, loading } = useAuth();
+  const { user, loading, updateXP } = useAuth();
 
   // Theme management
   useEffect(() => {
@@ -167,9 +167,10 @@ function App() {
     setCurrentView('roadmap');
   };
 
-  const handleLessonComplete = (xpEarned: number) => {
-    // In a real app, this would update user XP and progress
-    console.log(`Lesson completed! Earned ${xpEarned} XP`);
+  const handleLessonComplete = async (xpEarned: number) => {
+    if (user && updateXP) {
+      await updateXP(xpEarned);
+    }
     setShowMicroLearning(false);
   };
 
@@ -179,53 +180,55 @@ function App() {
     setShowProjectSubmission(false);
   };
 
-  const handleProtectedAction = (action: () => void) => {
-    if (!user) {
+  const handleViewChange = (view: string) => {
+    // Check if authentication is required for certain views
+    const protectedViews = ['dashboard', 'roadmap'];
+    if (protectedViews.includes(view) && !user) {
       setShowAuthModal(true);
       return;
     }
-    action();
+    setCurrentView(view);
   };
 
   const renderCurrentView = () => {
-    if (loading) {
-      return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center pt-16">
-          <div className="text-center">
-            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-          </div>
-        </div>
-      );
-    }
-
     switch (currentView) {
       case 'home':
         return <LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />;
       case 'quiz':
         return (
-          <ProtectedRoute fallback={<LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />}>
+          <ProtectedRoute>
             <CareerQuiz onComplete={handleQuizComplete} currentLanguage={currentLanguage} />
           </ProtectedRoute>
         );
       case 'results':
         return quizResult ? (
-          <QuizResults 
-            result={quizResult} 
-            onViewRoadmap={handleViewRoadmap}
-            currentLanguage={currentLanguage}
-          />
-        ) : <LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />;
+          <ProtectedRoute>
+            <QuizResults 
+              result={quizResult} 
+              onViewRoadmap={handleViewRoadmap}
+              currentLanguage={currentLanguage}
+            />
+          </ProtectedRoute>
+        ) : null;
       case 'dashboard':
         return (
-          <ProtectedRoute fallback={<LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />}>
-            <Dashboard user={user!} onViewRoadmap={handleViewRoadmap} currentLanguage={currentLanguage} />
+          <ProtectedRoute>
+            {user && (
+              <Dashboard 
+                user={user} 
+                onViewRoadmap={handleViewRoadmap} 
+                currentLanguage={currentLanguage} 
+              />
+            )}
           </ProtectedRoute>
         );
       case 'roadmap':
         return (
-          <ProtectedRoute fallback={<LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />}>
-            <Roadmap careerPath={quizResult?.careerPath || user?.careerPath || 'Frontend Developer'} currentLanguage={currentLanguage} />
+          <ProtectedRoute>
+            <Roadmap 
+              careerPath={quizResult?.careerPath || user?.careerPath || 'Frontend Developer'} 
+              currentLanguage={currentLanguage} 
+            />
           </ProtectedRoute>
         );
       default:
@@ -233,37 +236,42 @@ function App() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
       <Header 
         currentView={currentView} 
-        onViewChange={setCurrentView}
-        onOpenAIMentor={() => handleProtectedAction(() => setShowAIMentor(true))}
-        onOpenResumeBuilder={() => handleProtectedAction(() => setShowResumeBuilder(true))}
-        onOpenCommunityForum={() => handleProtectedAction(() => setShowCommunityForum(true))}
-        onOpenMonetizationGuide={() => handleProtectedAction(() => setShowMonetizationGuide(true))}
-        onOpenMicroLearning={() => handleProtectedAction(() => setShowMicroLearning(true))}
-        onOpenProjectSubmission={() => handleProtectedAction(() => setShowProjectSubmission(true))}
-        onOpenLiveEvents={() => handleProtectedAction(() => setShowLiveEvents(true))}
-        onOpenLearningFeed={() => handleProtectedAction(() => setShowLearningFeed(true))}
-        onOpenGamification={() => handleProtectedAction(() => setShowGamification(true))}
-        onOpenPersonalizedVideos={() => handleProtectedAction(() => setShowPersonalizedVideos(true))}
+        onViewChange={handleViewChange}
+        onOpenAIMentor={() => setShowAIMentor(true)}
+        onOpenResumeBuilder={() => setShowResumeBuilder(true)}
+        onOpenCommunityForum={() => setShowCommunityForum(true)}
+        onOpenMonetizationGuide={() => setShowMonetizationGuide(true)}
+        onOpenMicroLearning={() => setShowMicroLearning(true)}
+        onOpenProjectSubmission={() => setShowProjectSubmission(true)}
+        onOpenLiveEvents={() => setShowLiveEvents(true)}
+        onOpenLearningFeed={() => setShowLearningFeed(true)}
+        onOpenGamification={() => setShowGamification(true)}
+        onOpenPersonalizedVideos={() => setShowPersonalizedVideos(true)}
         currentTheme={theme}
         onThemeChange={setTheme}
         currentLanguage={currentLanguage}
         user={user}
-        onShowAuth={() => setShowAuthModal(true)}
+        onOpenAuth={() => setShowAuthModal(true)}
       />
 
       {renderCurrentView()}
       
       {/* Modals and Overlays */}
-      <AuthModal 
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        currentLanguage={currentLanguage}
-      />
-
       <AIMentor 
         isOpen={showAIMentor} 
         onClose={() => setShowAIMentor(false)}
@@ -338,6 +346,11 @@ function App() {
           currentLanguage={currentLanguage}
         />
       )}
+
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+      />
     </div>
   );
 }

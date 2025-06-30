@@ -3,137 +3,78 @@ import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
 
-export interface AuthState {
+interface AuthState {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, userData: Partial<User>) => Promise<{ error?: string }>;
-  signIn: (email: string, password: string) => Promise<{ error?: string }>;
-  signOut: () => Promise<void>;
-  updateProfile: (updates: Partial<User>) => Promise<{ error?: string }>;
 }
 
-export const useAuth = (): AuthState => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+export const useAuth = () => {
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    session: null,
+    loading: true,
+  });
 
   useEffect(() => {
-    let mounted = true;
-
     // Get initial session
-    const getInitialSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (!mounted) return;
-        
-        if (error) {
-          console.error('Error getting session:', error);
-          setLoading(false);
-          return;
-        }
-
-        setSession(session);
-        
-        if (session?.user) {
-          await fetchUserProfile(session.user.id);
-        } else {
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Error in getInitialSession:', error);
-        if (mounted) {
-          setLoading(false);
-        }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthState(prev => ({ ...prev, session }));
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      } else {
+        setAuthState(prev => ({ ...prev, loading: false }));
       }
-    };
-
-    getInitialSession();
+    });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      
-      console.log('Auth state changed:', event, session?.user?.id);
-      setSession(session);
+      setAuthState(prev => ({ ...prev, session }));
       
       if (session?.user) {
-        await fetchUserProfile(session.user.id);
+        if (event === 'SIGNED_IN') {
+          await fetchUserProfile(session.user.id);
+        }
       } else {
-        setUser(null);
-        setLoading(false);
+        setAuthState({ user: null, session: null, loading: false });
       }
     });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      console.log('Fetching user profile for:', userId);
-      
-      const { data, error } = await supabase
+      const { data: userProfile, error } = await supabase
         .from('users')
-        .select('*')
+        .select(`
+          *,
+          certificates (*)
+        `)
         .eq('id', userId)
         .single();
 
       if (error) {
         console.error('Error fetching user profile:', error);
-        
-        // If user doesn't exist, create a basic profile
-        if (error.code === 'PGRST116') {
-          console.log('User profile not found, will be created by trigger');
-          // Set a basic user object while waiting for the trigger to create the profile
-          const session = await supabase.auth.getSession();
-          if (session.data.session?.user) {
-            const basicUser: User = {
-              id: userId,
-              name: session.data.session.user.email?.split('@')[0] || 'User',
-              email: session.data.session.user.email || '',
-              level: 1,
-              xp: 0,
-              totalXp: 0,
-              streak: 0,
-              completedLessons: 0,
-              certificates: [],
-              joinedAt: new Date(),
-              language: 'en'
-            };
-            setUser(basicUser);
-          }
-        }
-        setLoading(false);
+        setAuthState(prev => ({ ...prev, loading: false }));
         return;
       }
 
-      if (data) {
-        console.log('User profile found:', data);
-        
-        // Fetch certificates
-        const { data: certificates } = await supabase
-          .from('certificates')
-          .select('*')
-          .eq('user_id', userId);
-
-        const userProfile: User = {
-          id: data.id,
-          name: data.name,
-          email: data.email,
-          avatar: data.avatar_url,
-          careerPath: data.career_path,
-          level: data.level,
-          xp: data.xp,
-          totalXp: data.total_xp,
-          streak: data.streak,
-          completedLessons: data.completed_lessons,
-          certificates: certificates?.map(cert => ({
+      if (userProfile) {
+        const user: User = {
+          id: userProfile.id,
+          name: userProfile.name,
+          email: userProfile.email,
+          avatar: userProfile.avatar_url,
+          careerPath: userProfile.career_path,
+          level: userProfile.level,
+          xp: userProfile.xp,
+          totalXp: userProfile.total_xp,
+          streak: userProfile.streak,
+          completedLessons: userProfile.completed_lessons,
+          certificates: userProfile.certificates.map((cert: any) => ({
             id: cert.id,
             name: cert.name,
             careerTrack: cert.career_track,
@@ -142,102 +83,110 @@ export const useAuth = (): AuthState => {
             uniqueId: cert.unique_id,
             verified: cert.verified,
             skills: cert.skills,
-            grade: cert.grade
-          })) || [],
-          joinedAt: new Date(data.joined_at),
-          country: data.country,
-          language: data.language,
-          learningStyle: data.learning_style,
-          timeCommitment: data.time_commitment,
-          githubUrl: data.github_url,
-          portfolioUrl: data.portfolio_url,
-          personalityType: data.personality_type,
-          studyHours: data.study_hours,
-          weeklyGoal: data.weekly_goal,
-          squad: data.squad,
-          followers: data.followers,
-          following: data.following
+            grade: cert.grade,
+          })),
+          joinedAt: new Date(userProfile.joined_at),
+          country: userProfile.country,
+          language: userProfile.language,
+          learningStyle: userProfile.learning_style,
+          timeCommitment: userProfile.time_commitment,
+          githubUrl: userProfile.github_url,
+          portfolioUrl: userProfile.portfolio_url,
+          personalityType: userProfile.personality_type,
+          studyHours: userProfile.study_hours,
+          weeklyGoal: userProfile.weekly_goal,
+          squad: userProfile.squad,
+          followers: userProfile.followers,
+          following: userProfile.following,
         };
 
-        setUser(userProfile);
+        setAuthState({ user, session: authState.session, loading: false });
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
-    } finally {
-      setLoading(false);
+      setAuthState(prev => ({ ...prev, loading: false }));
     }
   };
 
-  const signUp = async (email: string, password: string, userData: Partial<User>) => {
+  const signUp = async (email: string, password: string, name: string) => {
     try {
-      setLoading(true);
-      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            name: userData.name,
-            language: userData.language || 'en'
-          }
-        }
+            name,
+          },
+        },
       });
 
-      if (error) {
-        setLoading(false);
-        return { error: error.message };
+      if (error) throw error;
+
+      // Create user profile
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id,
+            email: data.user.email!,
+            name,
+            language: 'en',
+            level: 1,
+            xp: 0,
+            total_xp: 0,
+            streak: 0,
+            completed_lessons: 0,
+            study_hours: 0,
+            weekly_goal: 10,
+            followers: 0,
+            following: 0,
+          });
+
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+          throw profileError;
+        }
       }
 
-      if (data.user && !data.session) {
-        setLoading(false);
-        return { error: 'Please check your email to confirm your account.' };
-      }
-
-      // The user profile will be created by the database trigger
-      // and fetchUserProfile will be called by the auth state change listener
-      
-      return {};
+      return { data, error: null };
     } catch (error) {
-      setLoading(false);
-      return { error: 'An unexpected error occurred' };
+      console.error('Error in signUp:', error);
+      return { data: null, error };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      setLoading(true);
-      
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        setLoading(false);
-        return { error: error.message };
-      }
-
-      // fetchUserProfile will be called by the auth state change listener
-      return {};
+      if (error) throw error;
+      return { data, error: null };
     } catch (error) {
-      setLoading(false);
-      return { error: 'An unexpected error occurred' };
+      console.error('Error in signIn:', error);
+      return { data: null, error };
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error in signOut:', error);
+    }
   };
 
   const updateProfile = async (updates: Partial<User>) => {
-    if (!user) return { error: 'No user logged in' };
+    if (!authState.user) return { error: 'No user logged in' };
 
     try {
       const { error } = await supabase
         .from('users')
         .update({
           name: updates.name,
-          avatar_url: updates.avatar,
           career_path: updates.careerPath,
           country: updates.country,
           language: updates.language,
@@ -246,31 +195,59 @@ export const useAuth = (): AuthState => {
           github_url: updates.githubUrl,
           portfolio_url: updates.portfolioUrl,
           personality_type: updates.personalityType,
-          study_hours: updates.studyHours,
           weekly_goal: updates.weeklyGoal,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', user.id);
+        .eq('id', authState.user.id);
 
-      if (error) {
-        return { error: error.message };
-      }
+      if (error) throw error;
 
-      // Update local user state
-      setUser(prev => prev ? { ...prev, ...updates } : null);
-      return {};
+      // Refresh user profile
+      await fetchUserProfile(authState.user.id);
+      return { error: null };
     } catch (error) {
-      return { error: 'An unexpected error occurred' };
+      console.error('Error updating profile:', error);
+      return { error };
+    }
+  };
+
+  const updateXP = async (xpGained: number) => {
+    if (!authState.user) return { error: 'No user logged in' };
+
+    try {
+      const newXP = authState.user.xp + xpGained;
+      const newTotalXP = authState.user.totalXp + xpGained;
+      const newLevel = Math.floor(newTotalXP / 100) + 1;
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          xp: newXP,
+          total_xp: newTotalXP,
+          level: newLevel,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', authState.user.id);
+
+      if (error) throw error;
+
+      // Refresh user profile
+      await fetchUserProfile(authState.user.id);
+      return { error: null };
+    } catch (error) {
+      console.error('Error updating XP:', error);
+      return { error };
     }
   };
 
   return {
-    user,
-    session,
-    loading,
+    user: authState.user,
+    session: authState.session,
+    loading: authState.loading,
     signUp,
     signIn,
     signOut,
-    updateProfile
+    updateProfile,
+    updateXP,
   };
 };
