@@ -76,14 +76,89 @@ export const useAuth = () => {
       try {
         const { data: profile, error } = await db.getUser(supabaseUser.id);
 
-        if (error && error.message !== 'No rows returned') {
-          console.error('❌ Profile fetch error:', error);
-          // Don't throw error, create a basic user instead
+        // Only attempt to create a new user if we get a specific "No rows returned" error
+        // For other errors (like network timeouts), just create a basic user locally
+        if (error) {
+          console.error('❌ Profile fetch error:', error.message);
+          
+          // Create basic user locally without attempting database insert for non-"no rows" errors
+          const basicUser: User = {
+            id: supabaseUser.id,
+            name: supabaseUser.user_metadata?.name || supabaseUser.user_metadata?.full_name || 'User',
+            email: supabaseUser.email || '',
+            avatar_url: supabaseUser.user_metadata?.avatar_url || null,
+            careerPath: null,
+            level: 1,
+            xp: 0,
+            total_xp: 0,
+            streak: 0,
+            completed_lessons: 0,
+            certificates: [],
+            joined_at: new Date().toISOString(),
+            country: null,
+            language: 'en',
+            learning_style: null,
+            time_commitment: null,
+            github_url: null,
+            portfolio_url: null,
+            personality_type: null,
+            study_hours: 0,
+            weekly_goal: 10,
+            squad: null,
+            followers: 0,
+            following: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+
+          setAuthState(prev => ({
+            ...prev,
+            user: basicUser
+          }));
+
+          // Only try to create profile in database if the error indicates no user exists
+          if (error.message === 'No rows returned' || error.message.includes('No rows')) {
+            console.log('📝 Creating new user profile in database...');
+            if (supabase) {
+              supabase
+                .from('users')
+                .insert({
+                  id: supabaseUser.id,
+                  email: supabaseUser.email || '',
+                  name: basicUser.name,
+                  avatar_url: basicUser.avatar_url,
+                  language: 'en',
+                  level: 1,
+                  xp: 0,
+                  total_xp: 0,
+                  streak: 0,
+                  completed_lessons: 0,
+                  study_hours: 0,
+                  weekly_goal: 10,
+                  followers: 0,
+                  following: 0,
+                  joined_at: new Date().toISOString(),
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                .then(({ error: createError }) => {
+                  if (createError) {
+                    console.log('⚠️ Background profile creation failed:', createError.message);
+                  } else {
+                    console.log('✅ Background profile creation successful');
+                  }
+                });
+            }
+          } else {
+            console.log('⚠️ Skipping database insert due to non-"no rows" error:', error.message);
+          }
+
+          return;
         }
 
-        // If no profile exists or error occurred, create a basic user
-        if (!profile || error) {
-          console.log('📝 Creating basic user profile...');
+        // If no profile exists, create basic user locally and attempt database insert
+        if (!profile) {
+          console.log('📝 No profile found, creating basic user...');
           const basicUser: User = {
             id: supabaseUser.id,
             name: supabaseUser.user_metadata?.name || supabaseUser.user_metadata?.full_name || 'User',

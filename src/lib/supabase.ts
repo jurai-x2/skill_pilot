@@ -337,7 +337,7 @@ export const db = {
         .eq('id', id)
         .single();
 
-      const timeoutPromise = createTimeoutPromise(4000, 'Get user');
+      const timeoutPromise = createTimeoutPromise(8000, 'Get user');
       const { data, error } = await Promise.race([userPromise, timeoutPromise]) as any;
       
       if (error) {
@@ -461,7 +461,7 @@ export const db = {
         .eq('user_id', userId)
         .order('order_index', { ascending: true });
 
-      const timeoutPromise = createTimeoutPromise(4000, 'Get roadmap stages');
+      const timeoutPromise = createTimeoutPromise(8000, 'Get roadmap stages');
       const { data, error } = await Promise.race([getPromise, timeoutPromise]) as any;
       return { data, error };
     } catch (err: any) {
