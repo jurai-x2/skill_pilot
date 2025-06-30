@@ -88,7 +88,7 @@ export default function LandingPage({ onStartQuiz, currentLanguage }: LandingPag
   ];
 
   const handleWatchDemo = () => {
-    window.open('https://youtu.be/VdBnw-19eQ0?si=KawOy9_myCC1xO_H', '_blank');
+    window.open('https://youtu.be/n4qfjylL-dU?si=JDr0owX4XDSerKOV', '_blank');
   };
 
   return (
