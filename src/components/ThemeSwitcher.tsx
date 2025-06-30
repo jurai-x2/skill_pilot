@@ -58,15 +58,15 @@ export default function ThemeSwitcher({ currentTheme, onThemeChange }: ThemeSwit
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Backdrop */}
+            {/* Backdrop - FIXED: Higher z-index */}
             <div
-              className="fixed inset-0 z-10"
+              className="fixed inset-0 z-[9998]"
               onClick={() => setIsOpen(false)}
             />
             
-            {/* Dropdown */}
+            {/* Dropdown - FIXED: Much higher z-index for desktop visibility */}
             <motion.div
-              className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20"
+              className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-[9999]"
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}

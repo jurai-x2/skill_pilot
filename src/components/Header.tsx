@@ -174,7 +174,7 @@ export default function Header({
               <AnimatePresence>
                 {showLearningMenu && (
                   <motion.div
-                    className="absolute top-full right-0 mt-3 w-80 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-3 overflow-hidden"
+                    className="absolute top-full right-0 mt-3 w-80 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-3 overflow-hidden z-[100]"
                     initial={{ opacity: 0, y: -10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -232,7 +232,7 @@ export default function Header({
               <AnimatePresence>
                 {showToolsMenu && (
                   <motion.div
-                    className="absolute top-full right-0 mt-3 w-96 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-3 overflow-hidden"
+                    className="absolute top-full right-0 mt-3 w-96 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-3 overflow-hidden z-[100]"
                     initial={{ opacity: 0, y: -10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -278,7 +278,7 @@ export default function Header({
 
           {/* Enhanced Right side controls */}
           <div className="hidden xl:flex items-center space-x-4">
-            {/* Settings Dropdown */}
+            {/* Settings Dropdown - FIXED: Higher z-index */}
             <div className="relative">
               <motion.button
                 onClick={() => setShowSettingsMenu(!showSettingsMenu)}
@@ -292,7 +292,7 @@ export default function Header({
               <AnimatePresence>
                 {showSettingsMenu && (
                   <motion.div
-                    className="absolute top-full right-0 mt-3 w-80 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-4 overflow-hidden"
+                    className="absolute top-full right-0 mt-3 w-80 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-4 overflow-hidden z-[100]"
                     initial={{ opacity: 0, y: -10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -346,7 +346,7 @@ export default function Header({
                 <AnimatePresence>
                   {showUserMenu && (
                     <motion.div
-                      className="absolute top-full right-0 mt-3 w-64 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-3 overflow-hidden"
+                      className="absolute top-full right-0 mt-3 w-64 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-3 overflow-hidden z-[100]"
                       initial={{ opacity: 0, y: -10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -10, scale: 0.95 }}

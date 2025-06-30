@@ -66,15 +66,15 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Enhanced Backdrop for All Devices */}
+            {/* Enhanced Backdrop for All Devices - FIXED: Higher z-index */}
             <div
-              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+              className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-sm"
               onClick={() => setIsOpen(false)}
             />
             
-            {/* High Contrast Dropdown - Perfect visibility on ALL screen sizes */}
+            {/* High Contrast Dropdown - FIXED: Much higher z-index for desktop visibility */}
             <motion.div
-              className="absolute top-full mt-2 sm:mt-3 z-50 bg-white dark:bg-gray-800 backdrop-blur-2xl border-2 border-gray-300 dark:border-gray-600 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden
+              className="absolute top-full mt-2 sm:mt-3 z-[9999] bg-white dark:bg-gray-800 backdrop-blur-2xl border-2 border-gray-300 dark:border-gray-600 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden
                          /* Mobile: Full width with high contrast */
                          left-0 right-0 max-h-[70vh]
                          /* Small screens (640px+): Positioned dropdown */
