@@ -2,27 +2,29 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  avatar?: string;
+  avatar_url?: string;
   careerPath?: string;
   level: number;
   xp: number;
-  totalXp: number;
+  total_xp: number;
   streak: number;
-  completedLessons: number;
+  completed_lessons: number;
   certificates: Certificate[];
-  joinedAt: Date;
+  joined_at: string;
   country?: string;
   language: string;
-  learningStyle?: string;
-  timeCommitment?: string;
-  githubUrl?: string;
-  portfolioUrl?: string;
-  personalityType?: string;
-  studyHours?: number;
-  weeklyGoal?: number;
+  learning_style?: string;
+  time_commitment?: string;
+  github_url?: string;
+  portfolio_url?: string;
+  personality_type?: string;
+  study_hours?: number;
+  weekly_goal?: number;
   squad?: string;
   followers?: number;
   following?: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Certificate {

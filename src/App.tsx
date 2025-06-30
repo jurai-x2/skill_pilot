@@ -28,6 +28,7 @@ function App() {
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
+  const [authMessage, setAuthMessage] = useState<string>('');
   const [showAIMentor, setShowAIMentor] = useState(false);
   const [showResumeBuilder, setShowResumeBuilder] = useState(false);
   const [showCommunityForum, setShowCommunityForum] = useState(false);
@@ -146,6 +147,56 @@ function App() {
     loadQuizResult();
   }, [user, isConfigured]);
 
+  // Session timeout management
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    let warningTimeoutId: NodeJS.Timeout;
+
+    const resetTimeout = () => {
+      clearTimeout(timeoutId);
+      clearTimeout(warningTimeoutId);
+      
+      if (user && isConfigured) {
+        // Warn user 5 minutes before timeout
+        warningTimeoutId = setTimeout(() => {
+          const shouldContinue = confirm(
+            'Your session will expire in 5 minutes due to inactivity. Click OK to continue your session.'
+          );
+          if (!shouldContinue) {
+            // User chose to logout
+            window.location.reload();
+          }
+        }, 25 * 60 * 1000); // 25 minutes
+
+        // Auto logout after 30 minutes of inactivity
+        timeoutId = setTimeout(() => {
+          alert('Your session has expired due to inactivity. Please sign in again.');
+          window.location.reload();
+        }, 30 * 60 * 1000); // 30 minutes
+      }
+    };
+
+    const handleActivity = () => {
+      resetTimeout();
+    };
+
+    // Set up activity listeners
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
+
+    resetTimeout();
+
+    return () => {
+      clearTimeout(timeoutId);
+      clearTimeout(warningTimeoutId);
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+    };
+  }, [user, isConfigured]);
+
   // Mock lesson for micro-learning demo
   const mockLesson: Lesson = {
     id: '1',
@@ -180,6 +231,7 @@ function App() {
 
   const handleStartQuiz = () => {
     if (!user && isConfigured) {
+      setAuthMessage('Please log in or sign up to take the career quiz and save your results.');
       setAuthModalMode('signup');
       setShowAuthModal(true);
       return;
@@ -202,6 +254,7 @@ function App() {
 
   const handleViewRoadmap = () => {
     if (!user && isConfigured) {
+      setAuthMessage('Please sign in to access your personalized learning roadmap.');
       setAuthModalMode('signin');
       setShowAuthModal(true);
       return;
@@ -213,6 +266,7 @@ function App() {
     // Check if user needs to be authenticated for protected views
     const protectedViews = ['dashboard', 'roadmap'];
     if (protectedViews.includes(view) && !user && isConfigured) {
+      setAuthMessage('Please sign in to access this feature.');
       setAuthModalMode('signin');
       setShowAuthModal(true);
       return;
@@ -232,10 +286,27 @@ function App() {
     setShowProjectSubmission(false);
   };
 
-  const openAuthModal = (mode: 'signin' | 'signup') => {
+  const openAuthModal = (mode: 'signin' | 'signup', message?: string) => {
     setAuthModalMode(mode);
+    setAuthMessage(message || '');
     setShowAuthModal(true);
   };
+
+  const closeAuthModal = () => {
+    setShowAuthModal(false);
+    setAuthMessage('');
+  };
+
+  // Prevent direct URL access to protected routes
+  useEffect(() => {
+    const protectedViews = ['dashboard', 'roadmap'];
+    if (protectedViews.includes(currentView) && !user && isConfigured && !loading) {
+      setCurrentView('home');
+      setAuthMessage('Please sign in to access this feature.');
+      setAuthModalMode('signin');
+      setShowAuthModal(true);
+    }
+  }, [currentView, user, isConfigured, loading]);
 
   const renderCurrentView = () => {
     switch (currentView) {
@@ -243,7 +314,9 @@ function App() {
         return <LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />;
       case 'quiz':
         return (
-          <ProtectedRoute fallback={<LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />}>
+          <ProtectedRoute 
+            fallback={<LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />}
+          >
             <CareerQuiz onComplete={handleQuizComplete} currentLanguage={currentLanguage} />
           </ProtectedRoute>
         );
@@ -313,13 +386,12 @@ function App() {
       {renderCurrentView()}
       
       {/* Modals and Overlays */}
-      {isConfigured && (
-        <AuthModal 
-          isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
-          initialMode={authModalMode}
-        />
-      )}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={closeAuthModal}
+        initialMode={authModalMode}
+        message={authMessage}
+      />
       
       <AIMentor 
         isOpen={showAIMentor} 
