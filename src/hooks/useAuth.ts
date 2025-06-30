@@ -20,6 +20,8 @@ export const useAuth = () => {
 
   const loadUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
+      console.log('Loading user profile for:', supabaseUser.email);
+      
       if (!isSupabaseConfigured() || !supabase) {
         throw new Error('Supabase not configured');
       }
@@ -37,6 +39,7 @@ export const useAuth = () => {
 
       // If no profile exists, create one
       if (!profile) {
+        console.log('Creating new user profile...');
         const newProfile = {
           id: supabaseUser.id,
           email: supabaseUser.email || '',
@@ -81,6 +84,7 @@ export const useAuth = () => {
           certificates: []
         };
 
+        console.log('User profile created successfully');
         setAuthState(prev => ({
           ...prev,
           user,
@@ -96,6 +100,7 @@ export const useAuth = () => {
         certificates: []
       };
 
+      console.log('User profile loaded successfully');
       setAuthState(prev => ({
         ...prev,
         user,
@@ -118,10 +123,13 @@ export const useAuth = () => {
 
     const initializeAuth = async () => {
       try {
+        console.log('Initializing authentication...');
+        
         if (!isSupabaseConfigured()) {
           throw new Error('Supabase not configured. Please set up your environment variables.');
         }
 
+        console.log('Getting current session...');
         const { data: { session }, error } = await auth.getSession();
 
         if (!mounted) return;
@@ -133,17 +141,21 @@ export const useAuth = () => {
         }
 
         if (session?.user) {
+          console.log('Found existing session for:', session.user.email);
           await loadUserProfile(session.user);
         } else {
+          console.log('No existing session found');
           setAuthState(prev => ({ ...prev, loading: false }));
         }
       } catch (error: any) {
         console.error('Auth initialization error:', error);
-        setAuthState(prev => ({
-          ...prev,
-          error: error.message || 'Authentication initialization failed',
-          loading: false,
-        }));
+        if (mounted) {
+          setAuthState(prev => ({
+            ...prev,
+            error: error.message || 'Authentication initialization failed',
+            loading: false,
+          }));
+        }
       }
     };
 
@@ -194,6 +206,7 @@ export const useAuth = () => {
       throw new Error('Supabase not configured');
     }
 
+    console.log('Attempting to sign in:', email);
     setAuthState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
@@ -207,6 +220,7 @@ export const useAuth = () => {
 
       return { success: true, data, error: null };
     } catch (error: any) {
+      console.error('Sign in error:', error);
       setAuthState(prev => ({
         ...prev,
         error: error.message,
@@ -221,6 +235,7 @@ export const useAuth = () => {
       throw new Error('Supabase not configured');
     }
 
+    console.log('Attempting to sign up:', email);
     setAuthState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
@@ -233,6 +248,7 @@ export const useAuth = () => {
 
       return { success: true, data, error: null };
     } catch (error: any) {
+      console.error('Sign up error:', error);
       setAuthState(prev => ({
         ...prev,
         error: error.message,
@@ -243,6 +259,8 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
+    console.log('Signing out...');
+    
     if (!isSupabaseConfigured()) {
       setAuthState(prev => ({
         ...prev,

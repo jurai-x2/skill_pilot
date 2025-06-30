@@ -19,7 +19,7 @@ import AuthModal from './components/Auth/AuthModal';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { QuizResult, Lesson, Project } from './types';
 import { useAuth } from './hooks/useAuth';
-import { db } from './lib/supabase';
+import { db, isSupabaseConfigured } from './lib/supabase';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -42,7 +42,7 @@ function App() {
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [theme, setTheme] = useState<Theme>('system');
   
-  const { user, loading, error: authError } = useAuth();
+  const { user, loading, error: authError, isConfigured } = useAuth();
 
   // Theme management
   useEffect(() => {
@@ -120,7 +120,7 @@ function App() {
   // Load user's latest quiz result
   useEffect(() => {
     const loadQuizResult = async () => {
-      if (user) {
+      if (user && isConfigured) {
         try {
           const { data } = await db.getQuizResults(user.id);
           if (data && data.length > 0) {
@@ -145,7 +145,7 @@ function App() {
     };
 
     loadQuizResult();
-  }, [user]);
+  }, [user, isConfigured]);
 
   // Session timeout management
   useEffect(() => {
@@ -240,7 +240,7 @@ function App() {
   };
 
   const handleQuizComplete = async (result: QuizResult) => {
-    if (user) {
+    if (user && isConfigured) {
       // Save quiz result to database
       try {
         await db.saveQuizResult(user.id, result);
@@ -337,7 +337,7 @@ function App() {
       case 'roadmap':
         return (
           <ProtectedRoute>
-            <Roadmap careerPath={quizResult?.careerPath || user?.careerPath || 'Frontend Developer'} currentLanguage={currentLanguage} />
+            <Roadmap careerPath={quizResult?.careerPath || user?.career_path || 'Frontend Developer'} currentLanguage={currentLanguage} />
           </ProtectedRoute>
         );
       default:
@@ -367,6 +367,37 @@ function App() {
                 VITE_SUPABASE_URL=your-project-url<br/>
                 VITE_SUPABASE_ANON_KEY=your-anon-key
               </li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show configuration error if Supabase is not configured
+  if (!isConfigured) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Supabase Configuration Required</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">Please configure your Supabase environment variables to use authentication features.</p>
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-left">
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Setup Instructions:</h3>
+            <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+              <li>1. Create a Supabase project at <a href="https://supabase.com" className="text-primary-600 hover:underline" target="_blank" rel="noopener noreferrer">supabase.com</a></li>
+              <li>2. Go to Settings → API in your project</li>
+              <li>3. Copy your Project URL and anon public key</li>
+              <li>4. Update your .env file with:</li>
+              <li className="font-mono text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded mt-2">
+                VITE_SUPABASE_URL=https://your-project.supabase.co<br/>
+                VITE_SUPABASE_ANON_KEY=your-anon-key-here
+              </li>
+              <li>5. Restart your development server</li>
             </ol>
           </div>
         </div>
@@ -438,7 +469,7 @@ function App() {
       />
       
       <MonetizationGuide 
-        careerPath={user?.careerPath || 'Frontend Developer'}
+        careerPath={user?.career_path || 'Frontend Developer'}
         isOpen={showMonetizationGuide}
         onClose={() => setShowMonetizationGuide(false)}
         currentLanguage={currentLanguage}
