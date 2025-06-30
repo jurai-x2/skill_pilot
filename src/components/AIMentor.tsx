@@ -38,68 +38,19 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
-  const [assistantId, setAssistantId] = useState<string | null>(null);
-  const [threadId, setThreadId] = useState<string | null>(null);
-  const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const t = useTranslation(currentLanguage);
   const { user } = useAuth();
 
-  // Initialize the assistant when the component mounts
-  useEffect(() => {
-    if (isOpen && !assistantId) {
-      initializeAssistant();
-    }
-  }, [isOpen]);
-
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const initializeAssistant = async () => {
-    setIsInitializing(true);
-    setError(null);
-    
-    try {
-      // Try to get the assistant ID from localStorage first
-      const savedAssistantId = localStorage.getItem('aiMentorAssistantId');
-      
-      if (savedAssistantId) {
-        setAssistantId(savedAssistantId);
-        setIsInitializing(false);
-        return;
-      }
-      
-      // Create a new assistant
-      const response = await fetch('/api/ai-mentor/create-assistant', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to initialize AI Mentor');
-      }
-      
-      const data = await response.json();
-      setAssistantId(data.id);
-      
-      // Save the assistant ID to localStorage
-      localStorage.setItem('aiMentorAssistantId', data.id);
-    } catch (err: any) {
-      console.error('❌ Error initializing AI Mentor:', err);
-      setError('Failed to initialize AI Mentor. Please try again later.');
-    } finally {
-      setIsInitializing(false);
-    }
-  };
-
   const handleSendMessage = async () => {
-    if ((!inputMessage.trim() && attachments.length === 0) || isTyping) return;
+    if (!inputMessage.trim() && attachments.length === 0) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -113,108 +64,43 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
     setInputMessage('');
     setAttachments([]);
     setIsTyping(true);
-    setError(null);
 
-    try {
-      if (attachments.length > 0) {
-        // Handle file uploads first
-        for (const attachment of attachments) {
-          await handleFileUpload(attachment);
-        }
-      }
-      
-      // Send the message to the AI
-      const response = await fetch('/api/ai-mentor/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [...messages, userMessage],
-          assistantId,
-          threadId,
-          userId: user?.id
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to get response from AI Mentor');
-      }
-      
-      const data = await response.json();
-      
-      // Save the thread ID
-      if (data.threadId && !threadId) {
-        setThreadId(data.threadId);
-      }
-      
-      // Add the AI response to the messages
-      if (data.message) {
-        const aiResponse: ChatMessage = {
-          id: data.message.id,
-          content: data.message.content[0].text.value,
-          sender: 'ai',
-          timestamp: new Date(data.message.created_at * 1000)
-        };
-        
-        setMessages(prev => [...prev, aiResponse]);
-      }
-    } catch (err: any) {
-      console.error('❌ Error sending message:', err);
-      setError('Failed to get response. Please try again.');
-      
-      // Add an error message
-      const errorMessage: ChatMessage = {
-        id: Date.now().toString(),
-        content: "I'm sorry, I encountered an error processing your request. Please try again.",
+    // Simulate AI response
+    setTimeout(() => {
+      const aiResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        content: generateAIResponse(inputMessage, attachments),
         sender: 'ai',
         timestamp: new Date()
       };
-      
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
+      setMessages(prev => [...prev, aiResponse]);
       setIsTyping(false);
-    }
+    }, 2000);
   };
 
-  const handleFileUpload = async (attachment: FileAttachment) => {
-    if (!assistantId || !threadId) {
-      setError('AI Mentor is not fully initialized. Please try again.');
-      return;
+  const generateAIResponse = (message: string, files: FileAttachment[]): string => {
+    if (files.length > 0) {
+      return t('aiMentor.fileAnalysis');
+    }
+
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('resume')) {
+      return t('aiMentor.resumeHelp');
     }
     
-    try {
-      // Create a FormData object to send the file
-      const formData = new FormData();
-      
-      // Convert the blob URL to a File object
-      const response = await fetch(attachment.url);
-      const blob = await response.blob();
-      const file = new File([blob], attachment.name, { type: attachment.type });
-      
-      formData.append('file', file);
-      formData.append('assistantId', assistantId);
-      formData.append('threadId', threadId);
-      
-      // Upload the file
-      const uploadResponse = await fetch('/api/ai-mentor/upload-file', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file');
-      }
-      
-      return await uploadResponse.json();
-    } catch (err: any) {
-      console.error('❌ Error uploading file:', err);
-      setError('Failed to upload file. Please try again.');
-      throw err;
+    if (lowerMessage.includes('career') || lowerMessage.includes('job')) {
+      return t('aiMentor.careerHelp');
     }
+    
+    if (lowerMessage.includes('code') || lowerMessage.includes('programming')) {
+      return t('aiMentor.codingHelp');
+    }
+    
+    return t('aiMentor.generalHelp');
   };
 
-  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
 
@@ -249,8 +135,8 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
   };
 
   const retryInitialization = () => {
-    setAssistantId(null);
-    initializeAssistant();
+    setError(null);
+    // In a real implementation, this would retry the initialization
   };
 
   if (!isOpen) return null;
@@ -287,112 +173,79 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
           </button>
         </div>
 
-        {/* Initialization State */}
-        {isInitializing && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <Loader className="w-10 h-10 text-primary-600 dark:text-primary-400 animate-spin mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Initializing AI Mentor</h3>
-              <p className="text-gray-600 dark:text-gray-400">Please wait while we set up your AI mentor...</p>
-            </div>
-          </div>
-        )}
-
-        {/* Error State */}
-        {error && !isInitializing && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center max-w-md mx-auto p-6">
-              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Something went wrong</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
-              <button
-                onClick={retryInitialization}
-                className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 mx-auto"
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span>Try Again</span>
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Messages */}
-        {!isInitializing && !error && (
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`flex items-start space-x-3 max-w-[80%] ${
-                  message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div className={`flex items-start space-x-3 max-w-[80%] ${
+                message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''
+              }`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  message.sender === 'user' 
+                    ? 'bg-primary-500' 
+                    : 'bg-gradient-to-br from-secondary-500 to-accent-500'
                 }`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    message.sender === 'user' 
-                      ? 'bg-primary-500' 
-                      : 'bg-gradient-to-br from-secondary-500 to-accent-500'
-                  }`}>
-                    {message.sender === 'user' ? (
-                      <User className="w-4 h-4 text-white" />
-                    ) : (
-                      <Sparkles className="w-4 h-4 text-white" />
-                    )}
-                  </div>
-                  <div className={`rounded-2xl p-4 ${
-                    message.sender === 'user'
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                  }`}>
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                    {message.attachments && (
-                      <div className="mt-3 space-y-2">
-                        {message.attachments.map((attachment) => {
-                          const FileIcon = getFileIcon(attachment.type);
-                          return (
-                            <div
-                              key={attachment.id}
-                              className="flex items-center space-x-2 p-2 bg-white bg-opacity-20 rounded-lg"
-                            >
-                              <FileIcon className="w-4 h-4" />
-                              <span className="text-sm">{attachment.name}</span>
-                              <span className="text-xs opacity-75">
-                                ({formatFileSize(attachment.size)})
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    <p className="text-xs opacity-75 mt-2">
-                      {message.timestamp.toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-secondary-500 to-accent-500 rounded-full flex items-center justify-center">
+                  {message.sender === 'user' ? (
+                    <User className="w-4 h-4 text-white" />
+                  ) : (
                     <Sparkles className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl p-4">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" />
-                      <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                      <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                  )}
+                </div>
+                <div className={`rounded-2xl p-4 ${
+                  message.sender === 'user'
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                }`}>
+                  <p className="whitespace-pre-wrap">{message.content}</p>
+                  {message.attachments && (
+                    <div className="mt-3 space-y-2">
+                      {message.attachments.map((attachment) => {
+                        const FileIcon = getFileIcon(attachment.type);
+                        return (
+                          <div
+                            key={attachment.id}
+                            className="flex items-center space-x-2 p-2 bg-white bg-opacity-20 rounded-lg"
+                          >
+                            <FileIcon className="w-4 h-4" />
+                            <span className="text-sm">{attachment.name}</span>
+                            <span className="text-xs opacity-75">
+                              ({formatFileSize(attachment.size)})
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
+                  )}
+                  <p className="text-xs opacity-75 mt-2">
+                    {message.timestamp.toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          {isTyping && (
+            <div className="flex justify-start">
+              <div className="flex items-start space-x-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-secondary-500 to-accent-500 rounded-full flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl p-4">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" />
+                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                   </div>
                 </div>
               </div>
-            )}
-            
-            <div ref={messagesEndRef} />
-          </div>
-        )}
+            </div>
+          )}
+          
+          <div ref={messagesEndRef} />
+        </div>
 
         {/* Attachments Preview */}
         {attachments.length > 0 && (
@@ -421,57 +274,55 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
         )}
 
         {/* Input */}
-        {!isInitializing && !error && (
-          <div className="p-6 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-end space-x-3">
-              <div className="flex-1">
-                <textarea
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  placeholder={t('aiMentor.placeholder')}
-                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl resize-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                  rows={3}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  disabled={isTyping}
-                />
-              </div>
-              <div className="flex flex-col space-y-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  onChange={handleFileInputChange}
-                  className="hidden"
-                  accept=".pdf,.doc,.docx,.txt,.js,.jsx,.ts,.tsx,.py,.java,.cpp,.c,.html,.css,.json,.csv,.png,.jpg,.jpeg"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-3 text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-xl transition-colors"
-                  title={t('aiMentor.uploadFile')}
-                  disabled={isTyping}
-                >
-                  <Paperclip className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={handleSendMessage}
-                  disabled={(!inputMessage.trim() && attachments.length === 0) || isTyping}
-                  className="p-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isTyping ? (
-                    <Loader className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Send className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
+        <div className="p-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-end space-x-3">
+            <div className="flex-1">
+              <textarea
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                placeholder={t('aiMentor.placeholder')}
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl resize-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                rows={3}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                disabled={isTyping}
+              />
+            </div>
+            <div className="flex flex-col space-y-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileUpload}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.txt,.js,.jsx,.ts,.tsx,.py,.java,.cpp,.c,.html,.css,.json,.csv,.png,.jpg,.jpeg"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-3 text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-xl transition-colors"
+                title={t('aiMentor.uploadFile')}
+                disabled={isTyping}
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleSendMessage}
+                disabled={(!inputMessage.trim() && attachments.length === 0) || isTyping}
+                className="p-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+              >
+                {isTyping ? (
+                  <Loader className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </button>
             </div>
           </div>
-        )}
+        </div>
       </motion.div>
     </motion.div>
   );
