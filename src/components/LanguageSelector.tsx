@@ -54,16 +54,16 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="flex items-center space-x-2 sm:space-x-3 px-3 sm:px-4 py-2.5 sm:py-3.5 bg-gradient-to-br from-white to-gray-50 dark:from-gray-700 dark:to-gray-800 hover:from-primary-50 hover:to-secondary-50 dark:hover:from-primary-900/30 dark:hover:to-secondary-900/30 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl group min-w-[120px] sm:min-w-[140px] border border-gray-200/50 dark:border-gray-600/50"
-        whileHover={{ scale: 1.05, y: -2 }}
-        whileTap={{ scale: 0.95 }}
+        className="flex items-center space-x-3 px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-primary-400 dark:hover:border-primary-500 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg group min-w-[160px]"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
       >
-        <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 dark:text-gray-200 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex-shrink-0" />
-        <span className="text-lg sm:text-xl flex-shrink-0">{currentLang.flag}</span>
-        <span className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-100 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors truncate">
+        <Globe className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex-shrink-0" />
+        <span className="text-xl flex-shrink-0">{currentLang.flag}</span>
+        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors truncate flex-1">
           {currentLang.nativeName}
         </span>
-        <ChevronDown className={`w-3 h-3 sm:w-4 sm:h-4 text-gray-700 dark:text-gray-200 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-all duration-300 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-gray-600 dark:text-gray-300 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-all duration-300 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
       </motion.button>
 
       <AnimatePresence>
@@ -71,13 +71,13 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
           <>
             {/* Ultra-high priority backdrop */}
             <div
-              className="fixed inset-0 z-[10998] bg-black/40 backdrop-blur-sm"
+              className="fixed inset-0 z-[99998] bg-black/30 backdrop-blur-sm"
               onClick={() => setIsOpen(false)}
             />
             
             {/* Maximum z-index dropdown with ultra-high contrast */}
             <motion.div
-              className="absolute top-full mt-2 sm:mt-3 z-[10999] bg-white dark:bg-gray-800 backdrop-blur-2xl border-2 border-gray-300 dark:border-gray-600 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden
+              className="absolute top-full mt-2 z-[99999] bg-white dark:bg-gray-800 backdrop-blur-2xl border-2 border-gray-300 dark:border-gray-600 rounded-2xl shadow-2xl overflow-hidden
                          /* Mobile: Full width with high contrast */
                          left-0 right-0 max-h-[70vh]
                          /* Small screens (640px+): Positioned dropdown */
@@ -95,37 +95,37 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
               onClick={(e) => e.stopPropagation()}
             >
               {/* High contrast gradient background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-secondary-500/10 rounded-2xl sm:rounded-3xl" />
+              <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-secondary-500/10 rounded-2xl" />
               
               <div className="relative">
                 {/* Header - ULTRA HIGH contrast and readable in dark theme */}
-                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
+                <div className="px-6 py-4 border-b-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">
                   <div className="flex items-center space-x-3">
-                    <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 dark:text-primary-400 flex-shrink-0" />
-                    <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white">
+                    <Globe className="w-6 h-6 text-primary-600 dark:text-primary-400 flex-shrink-0" />
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                       Select Language
                     </h3>
-                    <div className="ml-auto text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded-full">
+                    <div className="ml-auto text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-600 px-3 py-1 rounded-full">
                       85+ supported
                     </div>
                   </div>
                 </div>
 
                 {/* Language List - Maximum contrast and readability */}
-                <div className="overflow-y-auto p-2 sm:p-3 md:p-4 bg-white dark:bg-gray-800
+                <div className="overflow-y-auto p-4 bg-white dark:bg-gray-800
                                /* Responsive max heights */
                                max-h-[55vh] sm:max-h-80 md:max-h-96 lg:max-h-[28rem] xl:max-h-[32rem]">
-                  <div className="space-y-1 sm:space-y-1.5">
+                  <div className="space-y-2">
                     {languages.map((language, index) => (
                       <motion.button
                         key={language.code}
                         onClick={() => handleLanguageSelect(language.code)}
-                        className={`w-full flex items-center justify-between rounded-xl sm:rounded-2xl text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300 group touch-manipulation border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600
+                        className={`w-full flex items-center justify-between rounded-xl text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300 group touch-manipulation border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600
                                    /* Responsive padding for better touch targets */
-                                   px-3 py-3.5 sm:px-4 sm:py-3.5 md:px-5 md:py-4 lg:px-6 lg:py-4
+                                   px-4 py-4 sm:px-5 sm:py-4 md:px-6 md:py-4 lg:px-6 lg:py-4
                                    ${
                           currentLanguage === language.code 
-                            ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-800 dark:text-primary-200 shadow-md border-primary-300 dark:border-primary-600 font-semibold' 
+                            ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-800 dark:text-primary-200 shadow-md border-primary-400 dark:border-primary-600 font-semibold' 
                             : 'text-gray-800 dark:text-gray-100 hover:text-gray-900 dark:hover:text-white'
                         }`}
                         initial={{ opacity: 0, x: -20 }}
@@ -136,22 +136,22 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
                       >
                         <div className="flex items-center flex-1 min-w-0
                                        /* Responsive spacing */
-                                       space-x-3 sm:space-x-4 md:space-x-5">
+                                       space-x-4 sm:space-x-4 md:space-x-5">
                           <span className="flex-shrink-0
                                          /* Responsive flag size */
-                                         text-xl sm:text-2xl md:text-3xl lg:text-3xl">
+                                         text-2xl sm:text-2xl md:text-3xl lg:text-3xl">
                             {language.flag}
                           </span>
                           <div className="flex-1 min-w-0">
                             <div className="font-bold truncate
                                            /* Responsive text size with high contrast */
-                                           text-sm sm:text-base md:text-lg lg:text-lg
+                                           text-base sm:text-base md:text-lg lg:text-lg
                                            text-gray-900 dark:text-white">
                               {language.nativeName}
                             </div>
                             <div className="truncate font-medium
                                            /* Responsive subtitle size with good contrast */
-                                           text-xs sm:text-sm md:text-base lg:text-base
+                                           text-sm sm:text-sm md:text-base lg:text-base
                                            text-gray-600 dark:text-gray-300">
                               {language.name}
                             </div>
@@ -163,11 +163,11 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
                             animate={{ scale: 1 }}
                             className="flex items-center justify-center shadow-lg flex-shrink-0 bg-primary-600 dark:bg-primary-500 rounded-full border-2 border-white dark:border-gray-800
                                        /* Responsive check size */
-                                       w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8"
+                                       w-6 h-6 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8"
                           >
                             <Check className="text-white dark:text-white font-bold
                                              /* Responsive icon size */
-                                             w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 lg:w-5 lg:h-5" />
+                                             w-4 h-4 sm:w-4 sm:h-4 md:w-5 md:h-5 lg:w-5 lg:h-5" />
                           </motion.div>
                         )}
                       </motion.button>
@@ -176,13 +176,13 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
                 </div>
                 
                 {/* Footer - ULTRA HIGH contrast in dark theme */}
-                <div className="border-t-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700
+                <div className="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700
                                /* Responsive padding */
-                               p-3 sm:p-4 md:p-5 lg:p-6">
+                               p-4 sm:p-4 md:p-5 lg:p-6">
                   <div className="text-center">
-                    <div className="text-gray-700 dark:text-gray-200 font-semibold
+                    <div className="text-gray-800 dark:text-gray-100 font-semibold
                                    /* Responsive text size */
-                                   text-xs sm:text-sm md:text-base lg:text-base">
+                                   text-sm sm:text-sm md:text-base lg:text-base">
                       🌍 AI-powered translation available
                     </div>
                   </div>

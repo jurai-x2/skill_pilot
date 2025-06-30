@@ -52,7 +52,6 @@ export default function Header({
   const [showToolsMenu, setShowToolsMenu] = React.useState(false);
   const [showLearningMenu, setShowLearningMenu] = React.useState(false);
   const [showUserMenu, setShowUserMenu] = React.useState(false);
-  const [showSettingsMenu, setShowSettingsMenu] = React.useState(false);
   
   const t = useTranslation(currentLanguage);
   const { signOut } = useAuth();
@@ -92,14 +91,13 @@ export default function Header({
       setShowToolsMenu(false);
       setShowLearningMenu(false);
       setShowUserMenu(false);
-      setShowSettingsMenu(false);
     };
 
-    if (showToolsMenu || showLearningMenu || showUserMenu || showSettingsMenu) {
+    if (showToolsMenu || showLearningMenu || showUserMenu) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [showToolsMenu, showLearningMenu, showUserMenu, showSettingsMenu]);
+  }, [showToolsMenu, showLearningMenu, showUserMenu]);
 
   return (
     <motion.header 
@@ -181,7 +179,6 @@ export default function Header({
                   setShowLearningMenu(!showLearningMenu);
                   setShowToolsMenu(false);
                   setShowUserMenu(false);
-                  setShowSettingsMenu(false);
                 }}
                 className="flex items-center space-x-3 px-6 py-3.5 rounded-2xl font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-300"
                 whileHover={{ y: -2 }}
@@ -251,7 +248,6 @@ export default function Header({
                   setShowToolsMenu(!showToolsMenu);
                   setShowLearningMenu(false);
                   setShowUserMenu(false);
-                  setShowSettingsMenu(false);
                 }}
                 className="flex items-center space-x-3 px-6 py-3.5 rounded-2xl font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-300"
                 whileHover={{ y: -2 }}
@@ -315,81 +311,22 @@ export default function Header({
             </div>
           </nav>
 
-          {/* Enhanced Right side controls */}
+          {/* COMPLETELY REDESIGNED Right side controls - Simple and Direct */}
           <div className="hidden xl:flex items-center space-x-4">
-            {/* Settings Dropdown - COMPLETELY REDESIGNED for maximum visibility */}
-            <div className="relative">
-              <motion.button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowSettingsMenu(!showSettingsMenu);
-                  setShowToolsMenu(false);
-                  setShowLearningMenu(false);
-                  setShowUserMenu(false);
+            {/* Direct Language Selector - No dropdown, just inline */}
+            <div className="flex items-center space-x-2">
+              <LanguageSelector 
+                currentLanguage={currentLanguage}
+                onLanguageChange={(language) => {
+                  const event = new CustomEvent('languageChange', { detail: language });
+                  window.dispatchEvent(event);
                 }}
-                className="p-4 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-700 transition-all duration-300 shadow-lg hover:shadow-xl group"
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Settings className="w-6 h-6 text-gray-600 dark:text-gray-300 group-hover:text-gray-800 dark:group-hover:text-gray-100 transition-colors" />
-              </motion.button>
-
-              <AnimatePresence>
-                {showSettingsMenu && (
-                  <>
-                    {/* High-priority backdrop */}
-                    <div 
-                      className="fixed inset-0 z-[9998] bg-black/20 backdrop-blur-sm" 
-                      onClick={() => setShowSettingsMenu(false)} 
-                    />
-                    
-                    {/* Ultra-high z-index dropdown with maximum contrast */}
-                    <motion.div
-                      className="absolute top-full right-0 mt-3 w-80 bg-white dark:bg-gray-800 backdrop-blur-2xl rounded-2xl shadow-2xl border-2 border-gray-300 dark:border-gray-600 p-6 overflow-hidden z-[9999]"
-                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {/* Header */}
-                      <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-gray-200 dark:border-gray-600">
-                        <Settings className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Settings</h3>
-                      </div>
-                      
-                      {/* Settings Content */}
-                      <div className="space-y-6">
-                        {/* Language Setting */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                            Language
-                          </label>
-                          <div className="relative z-[10000]">
-                            <LanguageSelector 
-                              currentLanguage={currentLanguage}
-                              onLanguageChange={(language) => {
-                                const event = new CustomEvent('languageChange', { detail: language });
-                                window.dispatchEvent(event);
-                              }}
-                            />
-                          </div>
-                        </div>
-                        
-                        {/* Theme Setting */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                            Theme
-                          </label>
-                          <div className="relative z-[10000]">
-                            <ThemeSwitcher currentTheme={currentTheme} onThemeChange={onThemeChange} />
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
+              />
+            </div>
+            
+            {/* Direct Theme Switcher - No dropdown, just inline */}
+            <div className="flex items-center space-x-2">
+              <ThemeSwitcher currentTheme={currentTheme} onThemeChange={onThemeChange} />
             </div>
             
             {user ? (
@@ -400,7 +337,6 @@ export default function Header({
                     setShowUserMenu(!showUserMenu);
                     setShowToolsMenu(false);
                     setShowLearningMenu(false);
-                    setShowSettingsMenu(false);
                   }}
                   className="relative p-4 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 hover:from-primary-100 hover:to-secondary-100 dark:hover:from-primary-900/30 dark:hover:to-secondary-900/30 transition-all duration-300 shadow-lg hover:shadow-xl group"
                   whileHover={{ scale: 1.05, y: -2 }}
@@ -615,7 +551,7 @@ export default function Header({
                     </div>
                   </div>
 
-                  {/* Mobile Settings Section */}
+                  {/* Mobile Settings Section - SIMPLIFIED */}
                   <div className="px-8">
                     <div className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4 flex items-center space-x-2">
                       <Settings className="w-4 h-4" />
