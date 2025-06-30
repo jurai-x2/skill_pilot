@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Trophy, 
@@ -12,10 +12,13 @@ import {
   TrendingUp,
   Users,
   Calendar,
-  X
+  X,
+  Loader
 } from 'lucide-react';
 import { Achievement, Leaderboard, Challenge, User } from '../types';
 import { useTranslation } from '../utils/translations';
+import { useAuth } from '../hooks/useAuth';
+import { db } from '../lib/supabase';
 
 interface GamificationProps {
   user: User;
@@ -26,72 +29,118 @@ interface GamificationProps {
 
 export default function Gamification({ user, isOpen, onClose, currentLanguage = 'en' }: GamificationProps) {
   const [activeTab, setActiveTab] = useState<'achievements' | 'leaderboard' | 'challenges'>('achievements');
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user: currentUser } = useAuth();
   const t = useTranslation(currentLanguage);
 
-  const mockAchievements: Achievement[] = [
-    {
-      id: '1',
-      name: 'First Steps',
-      description: 'Complete your first lesson',
-      icon: '🎯',
-      earned: true,
-      earnedAt: new Date('2024-01-15'),
-      xpReward: 50,
-      category: 'learning',
-      rarity: 'common'
-    },
-    {
-      id: '2',
-      name: 'Quiz Master',
-      description: 'Score 100% on 5 quizzes',
-      icon: '🧠',
-      earned: true,
-      earnedAt: new Date('2024-01-20'),
-      xpReward: 100,
-      category: 'learning',
-      rarity: 'rare'
-    },
-    {
-      id: '3',
-      name: 'Week Warrior',
-      description: 'Maintain a 7-day learning streak',
-      icon: '🔥',
-      earned: user.streak >= 7,
-      xpReward: 150,
-      category: 'streak',
-      rarity: 'rare'
-    },
-    {
-      id: '4',
-      name: 'Project Pioneer',
-      description: 'Complete your first project',
-      icon: '🚀',
-      earned: false,
-      xpReward: 200,
-      category: 'project',
-      rarity: 'epic'
-    },
-    {
-      id: '5',
-      name: 'Level Legend',
-      description: 'Reach level 10',
-      icon: '👑',
-      earned: user.level >= 10,
-      xpReward: 500,
-      category: 'milestone',
-      rarity: 'legendary'
-    },
-    {
-      id: '6',
-      name: 'Community Helper',
-      description: 'Help 10 people in the forum',
-      icon: '🤝',
-      earned: false,
-      xpReward: 300,
-      category: 'social',
-      rarity: 'epic'
+  useEffect(() => {
+    if (isOpen && currentUser) {
+      loadAchievements();
     }
-  ];
+  }, [isOpen, currentUser]);
+
+  const loadAchievements = async () => {
+    if (!currentUser) return;
+
+    try {
+      setLoading(true);
+      const { data, error } = await db.getUserAchievements(currentUser.id);
+
+      if (error) {
+        console.error('❌ Error loading achievements:', error);
+        return;
+      }
+
+      if (data) {
+        setAchievements(data);
+      }
+
+      // If no achievements exist, create some default ones
+      if (!data || data.length === 0) {
+        await createDefaultAchievements();
+      }
+    } catch (err: any) {
+      console.error('❌ Error loading achievements:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createDefaultAchievements = async () => {
+    if (!currentUser) return;
+
+    const defaultAchievements = [
+      {
+        name: 'First Steps',
+        description: 'Complete your first lesson',
+        icon: '🎯',
+        xpReward: 50,
+        category: 'learning',
+        rarity: 'common',
+        earned: currentUser.completed_lessons > 0
+      },
+      {
+        name: 'Quiz Master',
+        description: 'Complete the career discovery quiz',
+        icon: '🧠',
+        xpReward: 100,
+        category: 'learning',
+        rarity: 'rare',
+        earned: !!currentUser.careerPath
+      },
+      {
+        name: 'Week Warrior',
+        description: 'Maintain a 7-day learning streak',
+        icon: '🔥',
+        xpReward: 150,
+        category: 'streak',
+        rarity: 'rare',
+        earned: currentUser.streak >= 7
+      },
+      {
+        name: 'Project Pioneer',
+        description: 'Complete your first project',
+        icon: '🚀',
+        xpReward: 200,
+        category: 'project',
+        rarity: 'epic',
+        earned: false
+      },
+      {
+        name: 'Level Legend',
+        description: 'Reach level 10',
+        icon: '👑',
+        xpReward: 500,
+        category: 'milestone',
+        rarity: 'legendary',
+        earned: currentUser.level >= 10
+      },
+      {
+        name: 'Community Helper',
+        description: 'Help 10 people in the forum',
+        icon: '🤝',
+        xpReward: 300,
+        category: 'social',
+        rarity: 'epic',
+        earned: false
+      }
+    ];
+
+    // Create achievements in database
+    for (const achievement of defaultAchievements) {
+      if (achievement.earned) {
+        try {
+          await db.unlockAchievement(currentUser.id, achievement);
+        } catch (err) {
+          console.error('❌ Error creating achievement:', err);
+        }
+      }
+    }
+
+    // Reload achievements
+    loadAchievements();
+  };
 
   const mockLeaderboard: Leaderboard = {
     id: '1',
@@ -100,34 +149,34 @@ export default function Gamification({ user, isOpen, onClose, currentLanguage = 
     entries: [
       {
         rank: 1,
-        user: { ...user, name: 'Sarah Chen', totalXp: 2450 },
+        user: { ...user, name: 'Sarah Chen', total_xp: 2450 },
         score: 2450,
         change: 2,
         badge: '🥇'
       },
       {
         rank: 2,
-        user: { ...user, name: 'Marcus Johnson', totalXp: 2380 },
+        user: { ...user, name: 'Marcus Johnson', total_xp: 2380 },
         score: 2380,
         change: -1,
         badge: '🥈'
       },
       {
         rank: 3,
-        user: { ...user, name: 'Elena Rodriguez', totalXp: 2250 },
+        user: { ...user, name: 'Elena Rodriguez', total_xp: 2250 },
         score: 2250,
         change: 1,
         badge: '🥉'
       },
       {
         rank: 4,
-        user: { ...user, name: 'Alex Chen', totalXp: 450 },
-        score: 450,
+        user: { ...user, name: user.name, total_xp: user.total_xp },
+        score: user.total_xp,
         change: 0
       },
       {
         rank: 5,
-        user: { ...user, name: 'David Kim', totalXp: 420 },
+        user: { ...user, name: 'David Kim', total_xp: 420 },
         score: 420,
         change: -2
       }
@@ -268,11 +317,11 @@ export default function Gamification({ user, isOpen, onClose, currentLanguage = 
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('gamification.yourProgress')}</h3>
                 <div className="grid md:grid-cols-4 gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">{mockAchievements.filter(a => a.earned).length}</div>
+                    <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">{achievements.filter(a => a.earned).length}</div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">{t('gamification.achievementsEarned')}</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-secondary-600 dark:text-secondary-400">{user.totalXp}</div>
+                    <div className="text-2xl font-bold text-secondary-600 dark:text-secondary-400">{user.total_xp}</div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">{t('gamification.totalXP')}</div>
                   </div>
                   <div className="text-center">
@@ -289,46 +338,55 @@ export default function Gamification({ user, isOpen, onClose, currentLanguage = 
               {/* Achievements Grid */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('gamification.allAchievements')}</h3>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {mockAchievements.map((achievement, index) => (
-                    <motion.div
-                      key={achievement.id}
-                      className={`p-6 rounded-xl border-2 transition-all ${
-                        achievement.earned 
-                          ? `${getRarityColor(achievement.rarity)} ${getRarityGlow(achievement.rarity)} shadow-lg`
-                          : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 opacity-60'
-                      }`}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      whileHover={{ scale: achievement.earned ? 1.05 : 1 }}
-                    >
-                      <div className="text-center">
-                        <div className="text-4xl mb-3">{achievement.icon}</div>
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">{achievement.name}</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{achievement.description}</p>
-                        
-                        <div className="flex items-center justify-between">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            achievement.earned ? 'bg-secondary-100 dark:bg-secondary-900/30 text-secondary-700 dark:text-secondary-300' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
-                          }`}>
-                            {achievement.rarity}
-                          </span>
-                          <div className="flex items-center space-x-1 text-sm">
-                            <Star className="w-4 h-4 text-amber-500" />
-                            <span className="font-medium">{achievement.xpReward} XP</span>
+                {loading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                      <Loader className="w-8 h-8 animate-spin text-primary-600 mx-auto mb-4" />
+                      <p className="text-gray-600 dark:text-gray-400">Loading achievements...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {achievements.map((achievement, index) => (
+                      <motion.div
+                        key={achievement.id}
+                        className={`p-6 rounded-xl border-2 transition-all ${
+                          achievement.earned 
+                            ? `${getRarityColor(achievement.rarity)} ${getRarityGlow(achievement.rarity)} shadow-lg`
+                            : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 opacity-60'
+                        }`}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        whileHover={{ scale: achievement.earned ? 1.05 : 1 }}
+                      >
+                        <div className="text-center">
+                          <div className="text-4xl mb-3">{achievement.icon}</div>
+                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">{achievement.name}</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{achievement.description}</p>
+                          
+                          <div className="flex items-center justify-between">
+                            <span className={`px-2 py-1 text-xs rounded-full ${
+                              achievement.earned ? 'bg-secondary-100 dark:bg-secondary-900/30 text-secondary-700 dark:text-secondary-300' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
+                            }`}>
+                              {achievement.rarity}
+                            </span>
+                            <div className="flex items-center space-x-1 text-sm">
+                              <Star className="w-4 h-4 text-amber-500" />
+                              <span className="font-medium">{achievement.xpReward} XP</span>
+                            </div>
                           </div>
-                        </div>
 
-                        {achievement.earned && achievement.earnedAt && (
-                          <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                            Earned {achievement.earnedAt.toLocaleDateString()}
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
+                          {achievement.earned && achievement.earned_at && (
+                            <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                              Earned {new Date(achievement.earned_at).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

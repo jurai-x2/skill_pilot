@@ -406,6 +406,12 @@ export const db = {
 
       const timeoutPromise = createTimeoutPromise(4000, 'Save quiz result');
       const { data, error } = await Promise.race([savePromise, timeoutPromise]) as any;
+      
+      // Also update user's career path
+      if (!error && data) {
+        await db.updateUser(userId, { career_path: result.careerPath });
+      }
+      
       return { data, error };
     } catch (err: any) {
       console.error('❌ Save quiz result error:', err);
@@ -433,6 +439,409 @@ export const db = {
     } catch (err: any) {
       console.error('❌ Get quiz results error:', err);
       return { data: [], error: { message: 'Network error fetching quiz results' } };
+    }
+  },
+
+  // Roadmap Stages
+  getRoadmapStages: async (userId: string) => {
+    if (!supabase) {
+      return { data: [], error: { message: 'Database not available' } };
+    }
+    
+    try {
+      console.log('📊 Getting roadmap stages for:', userId);
+      
+      const getPromise = supabase
+        .from('roadmap_stages')
+        .select(`
+          *,
+          lessons(*),
+          projects(*)
+        `)
+        .eq('user_id', userId)
+        .order('order_index', { ascending: true });
+
+      const timeoutPromise = createTimeoutPromise(4000, 'Get roadmap stages');
+      const { data, error } = await Promise.race([getPromise, timeoutPromise]) as any;
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Get roadmap stages error:', err);
+      return { data: [], error: { message: 'Network error fetching roadmap stages' } };
+    }
+  },
+
+  createRoadmapStages: async (userId: string, careerPath: string) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Database not available' } };
+    }
+    
+    try {
+      console.log('📊 Creating roadmap stages for:', userId, careerPath);
+      
+      // Define stages based on career path
+      const stageTemplates = {
+        'Frontend Developer': [
+          {
+            title: 'Foundations',
+            description: 'Master the basics of web development',
+            estimated_weeks: 4,
+            unlocked: true,
+            xp_required: 0,
+            order_index: 1
+          },
+          {
+            title: 'Frontend Frameworks',
+            description: 'Learn modern frontend development with React',
+            estimated_weeks: 6,
+            unlocked: false,
+            xp_required: 500,
+            order_index: 2
+          },
+          {
+            title: 'Advanced Concepts',
+            description: 'Master advanced frontend patterns and tools',
+            estimated_weeks: 8,
+            unlocked: false,
+            xp_required: 1000,
+            order_index: 3
+          }
+        ],
+        'Backend Developer': [
+          {
+            title: 'Programming Fundamentals',
+            description: 'Learn core programming concepts',
+            estimated_weeks: 4,
+            unlocked: true,
+            xp_required: 0,
+            order_index: 1
+          },
+          {
+            title: 'Server Development',
+            description: 'Build APIs and server-side applications',
+            estimated_weeks: 6,
+            unlocked: false,
+            xp_required: 500,
+            order_index: 2
+          },
+          {
+            title: 'Database & Deployment',
+            description: 'Master databases and cloud deployment',
+            estimated_weeks: 8,
+            unlocked: false,
+            xp_required: 1000,
+            order_index: 3
+          }
+        ],
+        'Data Scientist': [
+          {
+            title: 'Python & Statistics',
+            description: 'Learn Python programming and statistics',
+            estimated_weeks: 6,
+            unlocked: true,
+            xp_required: 0,
+            order_index: 1
+          },
+          {
+            title: 'Data Analysis',
+            description: 'Master data manipulation and visualization',
+            estimated_weeks: 8,
+            unlocked: false,
+            xp_required: 600,
+            order_index: 2
+          },
+          {
+            title: 'Machine Learning',
+            description: 'Build and deploy ML models',
+            estimated_weeks: 10,
+            unlocked: false,
+            xp_required: 1200,
+            order_index: 3
+          }
+        ]
+      };
+
+      const stages = stageTemplates[careerPath as keyof typeof stageTemplates] || stageTemplates['Frontend Developer'];
+      
+      const stagesToInsert = stages.map(stage => ({
+        ...stage,
+        user_id: userId
+      }));
+
+      const insertPromise = supabase
+        .from('roadmap_stages')
+        .insert(stagesToInsert)
+        .select();
+
+      const timeoutPromise = createTimeoutPromise(4000, 'Create roadmap stages');
+      const { data, error } = await Promise.race([insertPromise, timeoutPromise]) as any;
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Create roadmap stages error:', err);
+      return { data: null, error: { message: 'Network error creating roadmap stages' } };
+    }
+  },
+
+  updateStageProgress: async (stageId: string, completed: boolean) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Database not available' } };
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('roadmap_stages')
+        .update({ completed })
+        .eq('id', stageId)
+        .select()
+        .single();
+      
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Update stage progress error:', err);
+      return { data: null, error: { message: 'Network error updating stage progress' } };
+    }
+  },
+
+  // Lessons
+  updateLessonProgress: async (lessonId: string, completed: boolean, xpEarned?: number) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Database not available' } };
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('lessons')
+        .update({ completed })
+        .eq('id', lessonId)
+        .select()
+        .single();
+      
+      // Update user XP if lesson completed
+      if (!error && completed && xpEarned) {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData.user) {
+          await supabase.rpc('increment_user_xp', {
+            user_id: userData.user.id,
+            xp_amount: xpEarned
+          });
+        }
+      }
+      
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Update lesson progress error:', err);
+      return { data: null, error: { message: 'Network error updating lesson progress' } };
+    }
+  },
+
+  // Projects
+  updateProjectProgress: async (projectId: string, completed: boolean, approved?: boolean) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Database not available' } };
+    }
+    
+    try {
+      const updates: any = { completed };
+      if (approved !== undefined) updates.approved = approved;
+      
+      const { data, error } = await supabase
+        .from('projects')
+        .update(updates)
+        .eq('id', projectId)
+        .select()
+        .single();
+      
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Update project progress error:', err);
+      return { data: null, error: { message: 'Network error updating project progress' } };
+    }
+  },
+
+  // Forum Posts
+  getForumPosts: async (careerTrack?: string, limit = 20) => {
+    if (!supabase) {
+      return { data: [], error: { message: 'Database not available' } };
+    }
+    
+    try {
+      let query = supabase
+        .from('forum_posts')
+        .select(`
+          *,
+          users!forum_posts_user_id_fkey(name, avatar_url, career_path)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (careerTrack && careerTrack !== 'all') {
+        query = query.eq('career_track', careerTrack);
+      }
+
+      const { data, error } = await query;
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Get forum posts error:', err);
+      return { data: [], error: { message: 'Network error fetching forum posts' } };
+    }
+  },
+
+  createForumPost: async (userId: string, post: any) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Database not available' } };
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('forum_posts')
+        .insert({
+          user_id: userId,
+          title: post.title,
+          content: post.content,
+          career_track: post.careerTrack,
+          tags: post.tags || []
+        })
+        .select()
+        .single();
+      
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Create forum post error:', err);
+      return { data: null, error: { message: 'Network error creating forum post' } };
+    }
+  },
+
+  likeForumPost: async (postId: string) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Database not available' } };
+    }
+    
+    try {
+      const { data, error } = await supabase.rpc('increment_post_likes', {
+        post_id: postId
+      });
+      
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Like forum post error:', err);
+      return { data: null, error: { message: 'Network error liking post' } };
+    }
+  },
+
+  // Achievements
+  getUserAchievements: async (userId: string) => {
+    if (!supabase) {
+      return { data: [], error: { message: 'Database not available' } };
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('achievements')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Get user achievements error:', err);
+      return { data: [], error: { message: 'Network error fetching achievements' } };
+    }
+  },
+
+  unlockAchievement: async (userId: string, achievementData: any) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Database not available' } };
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('achievements')
+        .insert({
+          user_id: userId,
+          name: achievementData.name,
+          description: achievementData.description,
+          icon: achievementData.icon,
+          earned: true,
+          earned_at: new Date().toISOString(),
+          xp_reward: achievementData.xpReward,
+          category: achievementData.category,
+          rarity: achievementData.rarity
+        })
+        .select()
+        .single();
+      
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Unlock achievement error:', err);
+      return { data: null, error: { message: 'Network error unlocking achievement' } };
+    }
+  },
+
+  // Live Events
+  getLiveEvents: async (limit = 20) => {
+    if (!supabase) {
+      return { data: [], error: { message: 'Database not available' } };
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('live_events')
+        .select('*')
+        .gte('end_time', new Date().toISOString())
+        .order('start_time', { ascending: true })
+        .limit(limit);
+      
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Get live events error:', err);
+      return { data: [], error: { message: 'Network error fetching live events' } };
+    }
+  },
+
+  // Certificates
+  getUserCertificates: async (userId: string) => {
+    if (!supabase) {
+      return { data: [], error: { message: 'Database not available' } };
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('certificates')
+        .select('*')
+        .eq('user_id', userId)
+        .order('issued_at', { ascending: false });
+      
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Get user certificates error:', err);
+      return { data: [], error: { message: 'Network error fetching certificates' } };
+    }
+  },
+
+  issueCertificate: async (userId: string, certificateData: any) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Database not available' } };
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('certificates')
+        .insert({
+          user_id: userId,
+          name: certificateData.name,
+          career_track: certificateData.careerTrack,
+          project_url: certificateData.projectUrl,
+          unique_id: certificateData.uniqueId,
+          verified: true,
+          skills: certificateData.skills || [],
+          grade: certificateData.grade
+        })
+        .select()
+        .single();
+      
+      return { data, error };
+    } catch (err: any) {
+      console.error('❌ Issue certificate error:', err);
+      return { data: null, error: { message: 'Network error issuing certificate' } };
     }
   }
 };

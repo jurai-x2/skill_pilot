@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { Lesson, StudySession } from '../types';
 import { useTranslation } from '../utils/translations';
+import { useAuth } from '../hooks/useAuth';
+import { db } from '../lib/supabase';
 
 interface MicroLearningProps {
   lesson: Lesson;
@@ -32,6 +34,7 @@ export default function MicroLearning({ lesson, onComplete, onClose, currentLang
   const [startTime] = useState(new Date());
   const [quizAnswers, setQuizAnswers] = useState<Record<string, any>>({});
   const [showResults, setShowResults] = useState(false);
+  const { user } = useAuth();
   const t = useTranslation(currentLanguage);
 
   const steps = [
@@ -57,9 +60,28 @@ export default function MicroLearning({ lesson, onComplete, onClose, currentLang
     }
   }, [isPlaying]);
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     const studyTime = Math.floor((new Date().getTime() - startTime.getTime()) / 1000 / 60);
     const xpEarned = lesson.xpReward + (studyTime > 10 ? 10 : 0); // Bonus for focused study
+    
+    // Update lesson completion in database if user is logged in
+    if (user && lesson.id) {
+      try {
+        await db.updateLessonProgress(lesson.id, true, xpEarned);
+        
+        // Update user XP
+        if (user) {
+          await db.updateUser(user.id, {
+            xp: user.xp + xpEarned,
+            total_xp: user.total_xp + xpEarned,
+            completed_lessons: user.completed_lessons + 1
+          });
+        }
+      } catch (err) {
+        console.error('❌ Error updating lesson progress:', err);
+      }
+    }
+    
     onComplete(xpEarned);
   };
 
@@ -117,9 +139,7 @@ export default function MicroLearning({ lesson, onComplete, onClose, currentLang
             {lesson.type === 'article' && (
               <div className="prose max-w-none dark:prose-invert">
                 <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                  This is where the main lesson content would be displayed. In a real implementation,
-                  this would contain the actual educational content, formatted text, images, and
-                  interactive elements to help users learn effectively.
+                  {lesson.content || "This is where the main lesson content would be displayed. In a real implementation, this would contain the actual educational content, formatted text, images, and interactive elements to help users learn effectively."}
                 </p>
                 <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg mt-4">
                   <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Key Takeaway</h4>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Calendar, 
@@ -13,10 +13,12 @@ import {
   BellOff,
   Filter,
   Search,
-  X
+  X,
+  Loader
 } from 'lucide-react';
 import { LiveEvent } from '../types';
 import { useTranslation } from '../utils/translations';
+import { db } from '../lib/supabase';
 
 interface LiveEventsProps {
   isOpen: boolean;
@@ -28,7 +30,59 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [registeredEvents, setRegisteredEvents] = useState<Set<string>>(new Set());
+  const [events, setEvents] = useState<LiveEvent[]>([]);
+  const [loading, setLoading] = useState(true);
   const t = useTranslation(currentLanguage);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadEvents();
+    }
+  }, [isOpen]);
+
+  const loadEvents = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await db.getLiveEvents();
+
+      if (error) {
+        console.error('❌ Error loading live events:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Transform data to match our LiveEvent interface
+        const transformedEvents: LiveEvent[] = data.map(event => ({
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          type: event.type,
+          startTime: new Date(event.start_time),
+          endTime: new Date(event.end_time),
+          maxParticipants: event.max_participants || undefined,
+          currentParticipants: event.current_participants,
+          host: event.host,
+          registrationRequired: event.registration_required,
+          careerTracks: event.career_tracks || [],
+          meetingUrl: event.meeting_url || undefined,
+          recordingUrl: event.recording_url || undefined,
+          prizes: event.prizes || undefined,
+          featured: event.featured
+        }));
+
+        setEvents(transformedEvents);
+      } else {
+        // If no events, use mock data
+        setEvents(mockEvents);
+      }
+    } catch (err: any) {
+      console.error('❌ Error loading events:', err);
+      // Fallback to mock data
+      setEvents(mockEvents);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const mockEvents: LiveEvent[] = [
     {
@@ -105,14 +159,14 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
   ];
 
   const eventTypes = [
-    { id: 'all', name: t('liveEvents.allEvents'), count: mockEvents.length },
-    { id: 'workshop', name: t('liveEvents.workshops'), count: mockEvents.filter(e => e.type === 'workshop').length },
-    { id: 'hackathon', name: t('liveEvents.hackathons'), count: mockEvents.filter(e => e.type === 'hackathon').length },
-    { id: 'ama', name: t('liveEvents.amas'), count: mockEvents.filter(e => e.type === 'ama').length },
-    { id: 'career-talk', name: t('liveEvents.careerTalks'), count: mockEvents.filter(e => e.type === 'career-talk').length }
+    { id: 'all', name: t('liveEvents.allEvents'), count: events.length },
+    { id: 'workshop', name: t('liveEvents.workshops'), count: events.filter(e => e.type === 'workshop').length },
+    { id: 'hackathon', name: t('liveEvents.hackathons'), count: events.filter(e => e.type === 'hackathon').length },
+    { id: 'ama', name: t('liveEvents.amas'), count: events.filter(e => e.type === 'ama').length },
+    { id: 'career-talk', name: t('liveEvents.careerTalks'), count: events.filter(e => e.type === 'career-talk').length }
   ];
 
-  const filteredEvents = mockEvents.filter(event => {
+  const filteredEvents = events.filter(event => {
     const matchesFilter = selectedFilter === 'all' || event.type === selectedFilter;
     const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          event.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -246,7 +300,7 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">{t('liveEvents.events')}</span>
-                    <span className="font-medium text-gray-900 dark:text-white">5</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{events.length}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">{t('liveEvents.registered')}</span>
@@ -254,7 +308,9 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">{t('liveEvents.liveNow')}</span>
-                    <span className="font-medium text-green-600 dark:text-green-400">1</span>
+                    <span className="font-medium text-green-600 dark:text-green-400">
+                      {events.filter(e => isEventLive(e)).length}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -263,13 +319,119 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
 
           {/* Main Content */}
           <div className="flex-1 overflow-y-auto p-6">
-            <div className="space-y-6">
-              {/* Featured Events */}
-              {filteredEvents.some(e => e.featured) && (
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <Loader className="w-8 h-8 animate-spin text-primary-600 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">Loading events...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Featured Events */}
+                {filteredEvents.some(e => e.featured) && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('liveEvents.featuredEvents')}</h3>
+                    <div className="grid gap-4">
+                      {filteredEvents.filter(e => e.featured).map((event, index) => {
+                        const EventIcon = getEventTypeIcon(event.type);
+                        const isRegistered = registeredEvents.has(event.id);
+                        const isLive = isEventLive(event);
+                        const isUpcoming = isEventUpcoming(event);
+
+                        return (
+                          <motion.div
+                            key={event.id}
+                            className="bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border border-primary-200 dark:border-primary-700 rounded-xl p-6"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                          >
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex items-start space-x-4">
+                                <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                                  <EventIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2 mb-2">
+                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white">{event.title}</h4>
+                                    {isLive && (
+                                      <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full animate-pulse">
+                                        LIVE
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-gray-600 dark:text-gray-300 mb-3">{event.description}</p>
+                                  <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+                                    <div className="flex items-center space-x-1">
+                                      <Clock className="w-4 h-4" />
+                                      <span>{formatEventTime(event.startTime)}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-1">
+                                      <Users className="w-4 h-4" />
+                                      <span>{event.currentParticipants}/{event.maxParticipants || '∞'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => toggleRegistration(event.id)}
+                                  className={`p-2 rounded-lg transition-colors ${
+                                    isRegistered ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                  }`}
+                                >
+                                  {isRegistered ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                                </button>
+                                <button
+                                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                                    isLive
+                                      ? 'bg-red-500 text-white hover:bg-red-600'
+                                      : isRegistered
+                                      ? 'bg-secondary-500 text-white hover:bg-secondary-600'
+                                      : 'bg-primary-600 text-white hover:bg-primary-700'
+                                  }`}
+                                >
+                                  {isLive ? t('liveEvents.joinNow') : isRegistered ? t('liveEvents.registered') : t('liveEvents.register')}
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {event.prizes && (
+                              <div className="bg-white dark:bg-gray-800 bg-opacity-50 dark:bg-opacity-50 rounded-lg p-3 mb-3">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                                  <span className="font-medium text-gray-900 dark:text-white">Prizes</span>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {event.prizes.map((prize, i) => (
+                                    <span key={i} className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs rounded-full">
+                                      {prize}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-2">
+                              {event.careerTracks.map((track, i) => (
+                                <span key={i} className="px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-xs rounded-full">
+                                  {track}
+                                </span>
+                              ))}
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* All Events */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('liveEvents.featuredEvents')}</h3>
-                  <div className="grid gap-4">
-                    {filteredEvents.filter(e => e.featured).map((event, index) => {
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('liveEvents.allEvents')}</h3>
+                  <div className="space-y-4">
+                    {filteredEvents.map((event, index) => {
                       const EventIcon = getEventTypeIcon(event.type);
                       const isRegistered = registeredEvents.has(event.id);
                       const isLive = isEventLive(event);
@@ -278,19 +440,22 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
                       return (
                         <motion.div
                           key={event.id}
-                          className="bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border border-primary-200 dark:border-primary-700 rounded-xl p-6"
+                          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow"
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.1 }}
                         >
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-start space-x-4">
-                              <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
-                                <EventIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4 flex-1">
+                              <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                                <EventIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                               </div>
                               <div className="flex-1">
                                 <div className="flex items-center space-x-2 mb-2">
-                                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">{event.title}</h4>
+                                  <h4 className="font-semibold text-gray-900 dark:text-white">{event.title}</h4>
+                                  <span className={`px-2 py-1 text-xs rounded-full ${getEventTypeColor(event.type)}`}>
+                                    {event.type.replace('-', ' ')}
+                                  </span>
                                   {isLive && (
                                     <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full animate-pulse">
                                       LIVE
@@ -307,10 +472,11 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
                                     <Users className="w-4 h-4" />
                                     <span>{event.currentParticipants}/{event.maxParticipants || '∞'}</span>
                                   </div>
+                                  <span className="text-gray-500 dark:text-gray-400">by {event.host}</span>
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 ml-4">
                               <button
                                 onClick={() => toggleRegistration(event.id)}
                                 className={`p-2 rounded-lg transition-colors ${
@@ -332,114 +498,23 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
                               </button>
                             </div>
                           </div>
-                          
-                          {event.prizes && (
-                            <div className="bg-white dark:bg-gray-800 bg-opacity-50 dark:bg-opacity-50 rounded-lg p-3 mb-3">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                                <span className="font-medium text-gray-900 dark:text-white">Prizes</span>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {event.prizes.map((prize, i) => (
-                                  <span key={i} className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs rounded-full">
-                                    {prize}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="flex flex-wrap gap-2">
-                            {event.careerTracks.map((track, i) => (
-                              <span key={i} className="px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-xs rounded-full">
-                                {track}
-                              </span>
-                            ))}
-                          </div>
                         </motion.div>
                       );
                     })}
+
+                    {filteredEvents.length === 0 && !loading && (
+                      <div className="text-center py-12">
+                        <Calendar className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No events found</h3>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {searchQuery ? 'Try adjusting your search terms' : 'Check back later for upcoming events'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
-
-              {/* All Events */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('liveEvents.allEvents')}</h3>
-                <div className="space-y-4">
-                  {filteredEvents.map((event, index) => {
-                    const EventIcon = getEventTypeIcon(event.type);
-                    const isRegistered = registeredEvents.has(event.id);
-                    const isLive = isEventLive(event);
-                    const isUpcoming = isEventUpcoming(event);
-
-                    return (
-                      <motion.div
-                        key={event.id}
-                        className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-4 flex-1">
-                            <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                              <EventIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <h4 className="font-semibold text-gray-900 dark:text-white">{event.title}</h4>
-                                <span className={`px-2 py-1 text-xs rounded-full ${getEventTypeColor(event.type)}`}>
-                                  {event.type.replace('-', ' ')}
-                                </span>
-                                {isLive && (
-                                  <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full animate-pulse">
-                                    LIVE
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-gray-600 dark:text-gray-300 mb-3">{event.description}</p>
-                              <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-                                <div className="flex items-center space-x-1">
-                                  <Clock className="w-4 h-4" />
-                                  <span>{formatEventTime(event.startTime)}</span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  <Users className="w-4 h-4" />
-                                  <span>{event.currentParticipants}/{event.maxParticipants || '∞'}</span>
-                                </div>
-                                <span className="text-gray-500 dark:text-gray-400">by {event.host}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2 ml-4">
-                            <button
-                              onClick={() => toggleRegistration(event.id)}
-                              className={`p-2 rounded-lg transition-colors ${
-                                isRegistered ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
-                              }`}
-                            >
-                              {isRegistered ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-                            </button>
-                            <button
-                              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                                isLive
-                                  ? 'bg-red-500 text-white hover:bg-red-600'
-                                  : isRegistered
-                                  ? 'bg-secondary-500 text-white hover:bg-secondary-600'
-                                  : 'bg-primary-600 text-white hover:bg-primary-700'
-                              }`}
-                            >
-                              {isLive ? t('liveEvents.joinNow') : isRegistered ? t('liveEvents.registered') : t('liveEvents.register')}
-                            </button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </motion.div>

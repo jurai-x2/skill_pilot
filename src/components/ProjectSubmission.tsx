@@ -9,10 +9,13 @@ import {
   CheckCircle,
   AlertCircle,
   X,
-  Send
+  Send,
+  Loader
 } from 'lucide-react';
 import { Project, ProjectSubmission as ProjectSubmissionType } from '../types';
 import { useTranslation } from '../utils/translations';
+import { useAuth } from '../hooks/useAuth';
+import { db } from '../lib/supabase';
 
 interface ProjectSubmissionProps {
   project: Project;
@@ -27,6 +30,8 @@ export default function ProjectSubmission({ project, onSubmit, onClose, currentL
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   const t = useTranslation(currentLanguage);
 
   const submissionTypes = [
@@ -70,25 +75,57 @@ export default function ProjectSubmission({ project, onSubmit, onClose, currentL
   };
 
   const handleSubmit = async () => {
+    if (!user) {
+      setError('You must be logged in to submit a project');
+      return;
+    }
+    
     if (!submissionUrl && submissionType !== 'file-upload') return;
     if (submissionType === 'file-upload' && files.length === 0) return;
 
     setIsSubmitting(true);
+    setError(null);
 
-    // Simulate submission
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      // In a real implementation, we would upload files to storage here
+      let fileUrls: string[] = [];
+      if (submissionType === 'file-upload' && files.length > 0) {
+        // Mock file upload - in real app, upload to Supabase Storage
+        fileUrls = files.map(file => URL.createObjectURL(file));
+      }
 
-    const submission: Partial<ProjectSubmissionType> = {
-      projectId: project.id,
-      submissionType,
-      submissionUrl: submissionType === 'file-upload' ? 'files-uploaded' : submissionUrl,
-      description,
-      submittedAt: new Date(),
-      status: 'pending'
-    };
+      // Update project status in database
+      if (project.id) {
+        await db.updateProjectProgress(project.id, true);
+      }
 
-    onSubmit(submission);
-    setIsSubmitting(false);
+      // Create submission object
+      const submission: Partial<ProjectSubmissionType> = {
+        projectId: project.id,
+        userId: user.id,
+        submissionType,
+        submissionUrl: submissionType === 'file-upload' ? fileUrls.join(',') : submissionUrl,
+        description,
+        submittedAt: new Date(),
+        status: 'pending'
+      };
+
+      // Update user XP
+      if (user && project.xpReward) {
+        await db.updateUser(user.id, {
+          xp: user.xp + project.xpReward,
+          total_xp: user.total_xp + project.xpReward
+        });
+      }
+
+      // Call the onSubmit callback
+      onSubmit(submission);
+    } catch (err: any) {
+      console.error('❌ Error submitting project:', err);
+      setError('Failed to submit project. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isValid = () => {
@@ -118,6 +155,16 @@ export default function ProjectSubmission({ project, onSubmit, onClose, currentL
         </div>
 
         <div className="p-6 space-y-6">
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4 mb-4">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+                <p className="text-red-700 dark:text-red-300">{error}</p>
+              </div>
+            </div>
+          )}
+          
           {/* Project Requirements */}
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
             <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">{t('projectSubmission.requirements')}</h3>
@@ -290,7 +337,7 @@ export default function ProjectSubmission({ project, onSubmit, onClose, currentL
           >
             {isSubmitting ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <Loader className="w-4 h-4 animate-spin" />
                 <span>{t('projectSubmission.submitting')}</span>
               </>
             ) : (
