@@ -8,6 +8,7 @@ interface AuthState {
   session: Session | null;
   loading: boolean;
   error: string | null;
+  isConfigured: boolean;
 }
 
 export const useAuth = () => {
@@ -15,7 +16,8 @@ export const useAuth = () => {
     user: null,
     session: null,
     loading: true,
-    error: null
+    error: null,
+    isConfigured: isSupabaseConfigured()
   });
 
   useEffect(() => {
@@ -31,7 +33,8 @@ export const useAuth = () => {
               user: null,
               session: null,
               loading: false,
-              error: null
+              error: null,
+              isConfigured: false
             });
           }
           return;
@@ -64,11 +67,23 @@ export const useAuth = () => {
       } catch (error) {
         console.error('Auth initialization error:', error);
         if (mounted) {
-          setAuthState(prev => ({ 
-            ...prev, 
-            error: error instanceof Error ? error.message : 'Authentication failed', 
-            loading: false 
-          }));
+          // Handle timeout specifically - fall back to demo mode
+          if (error instanceof Error && error.message === 'Session check timeout') {
+            console.warn('Session check timeout - falling back to demo mode');
+            setAuthState({
+              user: null,
+              session: null,
+              loading: false,
+              error: null,
+              isConfigured: false
+            });
+          } else {
+            setAuthState(prev => ({ 
+              ...prev, 
+              error: error instanceof Error ? error.message : 'Authentication failed', 
+              loading: false 
+            }));
+          }
         }
       }
     };
@@ -90,7 +105,8 @@ export const useAuth = () => {
                 user: null,
                 session: null,
                 loading: false,
-                error: null
+                error: null,
+                isConfigured: authState.isConfigured
               });
             }
           } catch (error) {
@@ -143,7 +159,8 @@ export const useAuth = () => {
           user: mockUser,
           session: { user: supabaseUser } as Session,
           loading: false,
-          error: null
+          error: null,
+          isConfigured: authState.isConfigured
         });
         return;
       }
@@ -181,7 +198,8 @@ export const useAuth = () => {
           user,
           session: { user: supabaseUser } as Session,
           loading: false,
-          error: null
+          error: null,
+          isConfigured: authState.isConfigured
         });
       } else {
         // User profile doesn't exist, create a mock user
@@ -207,7 +225,8 @@ export const useAuth = () => {
           user: mockUser,
           session: { user: supabaseUser } as Session,
           loading: false,
-          error: null
+          error: null,
+          isConfigured: authState.isConfigured
         });
       }
     } catch (error) {
@@ -325,6 +344,6 @@ export const useAuth = () => {
     signIn,
     signOut,
     updateProfile,
-    isConfigured: isSupabaseConfigured()
+    isConfigured: authState.isConfigured
   };
 };
