@@ -228,6 +228,11 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
         setRegisteredEvents(newRegistrations);
         saveRegistrations(newRegistrations);
         
+        // Remove from detailed registrations
+        const detailedRegistrations = JSON.parse(localStorage.getItem('event_registrations_details') || '[]');
+        const updatedRegistrations = detailedRegistrations.filter((reg: any) => reg.eventId !== event.id);
+        localStorage.setItem('event_registrations_details', JSON.stringify(updatedRegistrations));
+        
         // Show toast
         setToastMessage(`You've unregistered from "${event.title}"`);
         setShowToast(true);

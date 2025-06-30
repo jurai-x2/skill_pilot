@@ -20,7 +20,10 @@ import {
   Loader,
   Clock,
   Users,
-  ExternalLink
+  ExternalLink,
+  MessageSquare,
+  Video,
+  Trophy
 } from 'lucide-react';
 import { User, LiveEvent } from '../types';
 import { useTranslation } from '../utils/translations';
@@ -76,10 +79,12 @@ export default function Profile({ isOpen, onClose, currentLanguage = 'en' }: Pro
     try {
       const savedRegistrations = localStorage.getItem('event_registrations_details');
       if (savedRegistrations) {
-        setRegisteredEvents(JSON.parse(savedRegistrations));
+        const parsedData = JSON.parse(savedRegistrations);
+        setRegisteredEvents(parsedData);
       }
     } catch (err) {
       console.error('Error loading registered events:', err);
+      setRegisteredEvents([]);
     }
   };
 
@@ -606,7 +611,7 @@ export default function Profile({ isOpen, onClose, currentLanguage = 'en' }: Pro
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Registered Events</h3>
               
-              {registeredEvents.length > 0 ? (
+              {registeredEvents && registeredEvents.length > 0 ? (
                 <div className="space-y-4">
                   {registeredEvents.map((event, index) => {
                     const EventIcon = getEventTypeIcon(event.eventType);
@@ -646,7 +651,9 @@ export default function Profile({ isOpen, onClose, currentLanguage = 'en' }: Pro
                                 className="flex items-center space-x-1 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm"
                                 onClick={() => {
                                   // In a real app, this would open the event details or join link
-                                  alert(`Join link for ${event.eventTitle} would open here`);
+                                  // Dispatch event to open live events modal
+                                  document.dispatchEvent(new CustomEvent('open-live-events'));
+                                  onClose();
                                 }}
                               >
                                 <ExternalLink className="w-4 h-4" />
