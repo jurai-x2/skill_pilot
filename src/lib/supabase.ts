@@ -13,27 +13,22 @@ export const isSupabaseConfigured = () => {
     supabaseUrl.includes('supabase.co'));
 };
 
-// Create Supabase client with fallback for demo mode
-export const supabase = isSupabaseConfigured() 
-  ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true
-      }
-    })
-  : null;
+// Create Supabase client - throw error if not configured
+if (!isSupabaseConfigured()) {
+  throw new Error('Supabase configuration missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+}
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
 
 // Auth helpers
 export const auth = {
   signUp: async (email: string, password: string, userData?: any) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { 
-        data: null, 
-        error: { message: 'Supabase not configured. Please set up your environment variables.' } 
-      };
-    }
-    
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -49,13 +44,6 @@ export const auth = {
   },
 
   signIn: async (email: string, password: string) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { 
-        data: null, 
-        error: { message: 'Supabase not configured. Please set up your environment variables.' } 
-      };
-    }
-    
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -68,10 +56,6 @@ export const auth = {
   },
 
   signOut: async () => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { error: null };
-    }
-    
     try {
       const { error } = await supabase.auth.signOut();
       return { error };
@@ -81,13 +65,6 @@ export const auth = {
   },
 
   resetPassword: async (email: string) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { 
-        data: null, 
-        error: { message: 'Supabase not configured. Please set up your environment variables.' } 
-      };
-    }
-    
     try {
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`
@@ -99,13 +76,6 @@ export const auth = {
   },
 
   updatePassword: async (password: string) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { 
-        data: null, 
-        error: { message: 'Supabase not configured. Please set up your environment variables.' } 
-      };
-    }
-    
     try {
       const { data, error } = await supabase.auth.updateUser({
         password
@@ -117,10 +87,6 @@ export const auth = {
   },
 
   getCurrentUser: () => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return Promise.resolve({ data: { user: null }, error: null });
-    }
-    
     try {
       return supabase.auth.getUser();
     } catch (err) {
@@ -129,10 +95,6 @@ export const auth = {
   },
 
   getSession: () => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return Promise.resolve({ data: { session: null }, error: null });
-    }
-    
     try {
       return supabase.auth.getSession();
     } catch (err) {
@@ -145,10 +107,6 @@ export const auth = {
 export const db = {
   // Users
   getUser: async (id: string) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: null, error: { message: 'Supabase not configured' } };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('users')
@@ -162,14 +120,10 @@ export const db = {
   },
 
   updateUser: async (id: string, updates: any) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: null, error: { message: 'Supabase not configured' } };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('users')
-        .update(updates)
+        .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single();
@@ -181,11 +135,6 @@ export const db = {
 
   // Quiz Results
   saveQuizResult: async (userId: string, result: any) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      console.log('Quiz result saved locally (Supabase not configured):', result);
-      return { data: result, error: null };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('quiz_results')
@@ -211,10 +160,6 @@ export const db = {
   },
 
   getQuizResults: async (userId: string) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: [], error: null };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('quiz_results')
@@ -229,10 +174,6 @@ export const db = {
 
   // Roadmap
   getRoadmapStages: async (userId: string) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: [], error: null };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('roadmap_stages')
@@ -250,10 +191,6 @@ export const db = {
   },
 
   updateStageProgress: async (stageId: string, completed: boolean) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: null, error: null };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('roadmap_stages')
@@ -268,10 +205,6 @@ export const db = {
   },
 
   updateLessonProgress: async (lessonId: string, completed: boolean) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: null, error: null };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('lessons')
@@ -286,10 +219,6 @@ export const db = {
   },
 
   updateProjectProgress: async (projectId: string, completed: boolean) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: null, error: null };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('projects')
@@ -305,10 +234,6 @@ export const db = {
 
   // Forum
   getForumPosts: async (careerTrack?: string) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: [], error: null };
-    }
-    
     try {
       let query = supabase
         .from('forum_posts')
@@ -331,10 +256,6 @@ export const db = {
   },
 
   createForumPost: async (userId: string, post: any) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: null, error: null };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('forum_posts')
@@ -352,10 +273,6 @@ export const db = {
 
   // Achievements
   getUserAchievements: async (userId: string) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: [], error: null };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('achievements')
@@ -369,10 +286,6 @@ export const db = {
   },
 
   awardAchievement: async (userId: string, achievement: any) => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: null, error: null };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('achievements')
@@ -392,10 +305,6 @@ export const db = {
 
   // Live Events
   getLiveEvents: async () => {
-    if (!isSupabaseConfigured() || !supabase) {
-      return { data: [], error: null };
-    }
-    
     try {
       const { data, error } = await supabase
         .from('live_events')

@@ -42,7 +42,7 @@ function App() {
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [theme, setTheme] = useState<Theme>('system');
   
-  const { user, loading, isConfigured } = useAuth();
+  const { user, loading, error: authError } = useAuth();
 
   // Theme management
   useEffect(() => {
@@ -120,7 +120,7 @@ function App() {
   // Load user's latest quiz result
   useEffect(() => {
     const loadQuizResult = async () => {
-      if (user && isConfigured) {
+      if (user) {
         try {
           const { data } = await db.getQuizResults(user.id);
           if (data && data.length > 0) {
@@ -145,7 +145,7 @@ function App() {
     };
 
     loadQuizResult();
-  }, [user, isConfigured]);
+  }, [user]);
 
   // Session timeout management
   useEffect(() => {
@@ -156,7 +156,7 @@ function App() {
       clearTimeout(timeoutId);
       clearTimeout(warningTimeoutId);
       
-      if (user && isConfigured) {
+      if (user) {
         // Warn user 5 minutes before timeout
         warningTimeoutId = setTimeout(() => {
           const shouldContinue = confirm(
@@ -195,7 +195,7 @@ function App() {
         document.removeEventListener(event, handleActivity, true);
       });
     };
-  }, [user, isConfigured]);
+  }, [user]);
 
   // Mock lesson for micro-learning demo
   const mockLesson: Lesson = {
@@ -230,7 +230,7 @@ function App() {
   };
 
   const handleStartQuiz = () => {
-    if (!user && isConfigured) {
+    if (!user) {
       setAuthMessage('Please log in or sign up to take the career quiz and save your results.');
       setAuthModalMode('signup');
       setShowAuthModal(true);
@@ -240,7 +240,7 @@ function App() {
   };
 
   const handleQuizComplete = async (result: QuizResult) => {
-    if (user && isConfigured) {
+    if (user) {
       // Save quiz result to database
       try {
         await db.saveQuizResult(user.id, result);
@@ -253,7 +253,7 @@ function App() {
   };
 
   const handleViewRoadmap = () => {
-    if (!user && isConfigured) {
+    if (!user) {
       setAuthMessage('Please sign in to access your personalized learning roadmap.');
       setAuthModalMode('signin');
       setShowAuthModal(true);
@@ -265,7 +265,7 @@ function App() {
   const handleViewChange = (view: string) => {
     // Check if user needs to be authenticated for protected views
     const protectedViews = ['dashboard', 'roadmap'];
-    if (protectedViews.includes(view) && !user && isConfigured) {
+    if (protectedViews.includes(view) && !user) {
       setAuthMessage('Please sign in to access this feature.');
       setAuthModalMode('signin');
       setShowAuthModal(true);
@@ -300,13 +300,13 @@ function App() {
   // Prevent direct URL access to protected routes
   useEffect(() => {
     const protectedViews = ['dashboard', 'roadmap'];
-    if (protectedViews.includes(currentView) && !user && isConfigured && !loading) {
+    if (protectedViews.includes(currentView) && !user && !loading) {
       setCurrentView('home');
       setAuthMessage('Please sign in to access this feature.');
       setAuthModalMode('signin');
       setShowAuthModal(true);
     }
-  }, [currentView, user, isConfigured, loading]);
+  }, [currentView, user, loading]);
 
   const renderCurrentView = () => {
     switch (currentView) {
@@ -345,17 +345,41 @@ function App() {
     }
   };
 
+  // Show error screen if authentication fails
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Configuration Error</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">{authError}</p>
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-left">
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">To fix this:</h3>
+            <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+              <li>1. Create a Supabase project at <a href="https://supabase.com" className="text-primary-600 hover:underline">supabase.com</a></li>
+              <li>2. Copy your project URL and anon key</li>
+              <li>3. Add them to your .env file as:</li>
+              <li className="font-mono text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded mt-2">
+                VITE_SUPABASE_URL=your-project-url<br/>
+                VITE_SUPABASE_ANON_KEY=your-anon-key
+              </li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading SkillPilot...</p>
-          {!isConfigured && (
-            <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
-              Running in demo mode - Supabase not configured
-            </p>
-          )}
         </div>
       </div>
     );

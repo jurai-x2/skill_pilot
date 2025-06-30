@@ -26,7 +26,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   
-  const { signIn, signUp, loading, error, isConfigured } = useAuth();
+  const { signIn, signUp, loading, error } = useAuth();
 
   const resetForm = () => {
     setFormData({ email: '', password: '', name: '', confirmPassword: '' });
@@ -83,14 +83,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!isConfigured) {
-      setSubmissionStatus({
-        type: 'error',
-        message: 'Authentication is not configured. Please set up Supabase to enable user accounts.'
-      });
-      return;
-    }
     
     if (!validateForm()) return;
 
@@ -201,22 +193,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
             </div>
           )}
 
-          {/* Demo Mode Warning */}
-          {!isConfigured && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
-              <div className="flex items-start space-x-2">
-                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-amber-800 dark:text-amber-200 text-sm font-medium">Demo Mode</p>
-                  <p className="text-amber-700 dark:text-amber-300 text-sm">
-                    Authentication is not configured. The app is running in demo mode. 
-                    To enable user accounts, please set up Supabase.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Status Messages */}
           {submissionStatus.type && (
             <div className={`p-3 border rounded-lg ${
@@ -264,7 +240,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
                     errors.name ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                   }`}
                   placeholder="Enter your full name"
-                  disabled={!isConfigured}
                 />
               </div>
               {errors.name && <p className="text-red-500 dark:text-red-400 text-sm mt-1">{errors.name}</p>}
@@ -286,7 +261,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
                   errors.email ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                 }`}
                 placeholder="Enter your email"
-                disabled={!isConfigured}
               />
             </div>
             {errors.email && <p className="text-red-500 dark:text-red-400 text-sm mt-1">{errors.email}</p>}
@@ -308,13 +282,11 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
                     errors.password ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                   }`}
                   placeholder={mode === 'signup' ? 'Create a strong password' : 'Enter your password'}
-                  disabled={!isConfigured}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
-                  disabled={!isConfigured}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -362,7 +334,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
                     errors.confirmPassword ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                   }`}
                   placeholder="Confirm your password"
-                  disabled={!isConfigured}
                 />
               </div>
               {errors.confirmPassword && <p className="text-red-500 dark:text-red-400 text-sm mt-1">{errors.confirmPassword}</p>}
@@ -372,13 +343,12 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || !isConfigured || submissionStatus.type === 'success'}
+            disabled={loading || submissionStatus.type === 'success'}
             className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}
             <span>
-              {!isConfigured ? 'Demo Mode - Auth Disabled' :
-               submissionStatus.type === 'success' ? 'Success!' :
+              {submissionStatus.type === 'success' ? 'Success!' :
                mode === 'signin' ? 'Sign In' : 
                mode === 'signup' ? 'Create Account' : 
                'Send Reset Link'}
@@ -386,7 +356,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
           </button>
 
           {/* Mode Switching */}
-          {isConfigured && submissionStatus.type !== 'success' && (
+          {submissionStatus.type !== 'success' && (
             <div className="text-center space-y-2">
               {mode === 'signin' && (
                 <>

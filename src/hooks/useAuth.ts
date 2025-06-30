@@ -8,7 +8,6 @@ interface AuthState {
   session: Session | null;
   loading: boolean;
   error: string | null;
-  isConfigured: boolean;
 }
 
 export const useAuth = () => {
@@ -16,20 +15,13 @@ export const useAuth = () => {
     user: null,
     session: null,
     loading: true,
-    error: null,
-    isConfigured: isSupabaseConfigured()
+    error: null
   });
 
   const loadUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
       if (!isSupabaseConfigured() || !supabase) {
-        setAuthState(prev => ({
-          ...prev,
-          user: null,
-          session: null,
-          loading: false
-        }));
-        return;
+        throw new Error('Supabase not configured');
       }
 
       const { data: profile, error } = await supabase
@@ -40,40 +32,67 @@ export const useAuth = () => {
 
       if (error && error.code !== 'PGRST116') {
         console.error('Profile fetch error:', error);
+        throw error;
+      }
+
+      // If no profile exists, create one
+      if (!profile) {
+        const newProfile = {
+          id: supabaseUser.id,
+          email: supabaseUser.email || '',
+          name: supabaseUser.user_metadata?.name || supabaseUser.user_metadata?.full_name || 'User',
+          avatar_url: supabaseUser.user_metadata?.avatar_url || null,
+          career_path: null,
+          level: 1,
+          xp: 0,
+          total_xp: 0,
+          streak: 0,
+          completed_lessons: 0,
+          joined_at: new Date().toISOString(),
+          country: null,
+          language: 'en',
+          learning_style: null,
+          time_commitment: null,
+          github_url: null,
+          portfolio_url: null,
+          personality_type: null,
+          study_hours: 0,
+          weekly_goal: 10,
+          squad: null,
+          followers: 0,
+          following: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        const { data: createdProfile, error: createError } = await supabase
+          .from('users')
+          .insert(newProfile)
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Profile creation error:', createError);
+          throw createError;
+        }
+
+        const user: User = {
+          ...createdProfile,
+          certificates: []
+        };
+
         setAuthState(prev => ({
           ...prev,
-          error: error.message,
-          loading: false
+          user,
+          session: { user: supabaseUser } as Session,
+          loading: false,
+          error: null
         }));
         return;
       }
 
-      const user: User = profile || {
-        id: supabaseUser.id,
-        email: supabaseUser.email || '',
-        name: supabaseUser.user_metadata?.name || supabaseUser.user_metadata?.full_name || 'User',
-        avatar_url: supabaseUser.user_metadata?.avatar_url || null,
-        careerPath: null,
-        level: 1,
-        xp: 0,
-        total_xp: 0,
-        streak: 0,
-        completed_lessons: 0,
-        joined_at: new Date().toISOString(),
-        country: null,
-        language: 'en',
-        learning_style: null,
-        time_commitment: null,
-        github_url: null,
-        portfolio_url: null,
-        personality_type: null,
-        study_hours: 0,
-        weekly_goal: 10,
-        squad: null,
-        followers: 0,
-        following: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+      const user: User = {
+        ...profile,
         certificates: []
       };
 
@@ -100,28 +119,12 @@ export const useAuth = () => {
     const initializeAuth = async () => {
       try {
         if (!isSupabaseConfigured()) {
-          console.warn('Supabase not configured. Running in demo mode.');
-          setAuthState({
-            user: null,
-            session: null,
-            loading: false,
-            error: null,
-            isConfigured: false,
-          });
-          return;
+          throw new Error('Supabase not configured. Please set up your environment variables.');
         }
 
-        // Add session fetch timeout
-        const sessionPromise = auth.getSession();
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Session check timeout')), 8000)
-        );
-
-        const sessionResult = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        const { data: { session }, error } = await auth.getSession();
 
         if (!mounted) return;
-
-        const { data: { session }, error } = sessionResult;
 
         if (error) {
           console.error('Session error:', error);
@@ -136,22 +139,11 @@ export const useAuth = () => {
         }
       } catch (error: any) {
         console.error('Auth initialization error:', error);
-        if (error.message === 'Session check timeout') {
-          console.warn('Timeout. Running in demo mode.');
-          setAuthState({
-            user: null,
-            session: null,
-            loading: false,
-            error: null,
-            isConfigured: false,
-          });
-        } else {
-          setAuthState(prev => ({
-            ...prev,
-            error: error.message || 'Unknown auth error',
-            loading: false,
-          }));
-        }
+        setAuthState(prev => ({
+          ...prev,
+          error: error.message || 'Authentication initialization failed',
+          loading: false,
+        }));
       }
     };
 
@@ -177,6 +169,9 @@ export const useAuth = () => {
               loading: false,
               error: null
             }));
+          } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+            // Refresh user profile on token refresh
+            await loadUserProfile(session.user);
           }
         });
         
@@ -279,10 +274,35 @@ export const useAuth = () => {
     }
   };
 
+  const updateProfile = async (updates: Partial<User>) => {
+    if (!authState.user || !isSupabaseConfigured()) {
+      throw new Error('User not authenticated or Supabase not configured');
+    }
+
+    try {
+      const { data, error } = await db.updateUser(authState.user.id, updates);
+      
+      if (error) throw error;
+
+      if (data) {
+        setAuthState(prev => ({
+          ...prev,
+          user: { ...prev.user!, ...data }
+        }));
+      }
+
+      return { success: true, data, error: null };
+    } catch (error: any) {
+      return { success: false, data: null, error };
+    }
+  };
+
   return {
     ...authState,
     signIn,
     signUp,
     signOut,
+    updateProfile,
+    isConfigured: isSupabaseConfigured()
   };
 };
