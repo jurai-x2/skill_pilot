@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, User, Menu, X, MessageCircle, FileText, Users, DollarSign, BookOpen, Upload, Calendar, Play, Trophy, Video, ChevronDown, Sparkles, Zap, Globe, LogOut } from 'lucide-react';
+import { Brain, User, Menu, X, MessageCircle, FileText, Users, DollarSign, BookOpen, Upload, Calendar, Play, Trophy, Video, ChevronDown, Sparkles, Zap, Globe, LogOut, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSelector from './LanguageSelector';
@@ -52,6 +52,7 @@ export default function Header({
   const [showToolsMenu, setShowToolsMenu] = React.useState(false);
   const [showLearningMenu, setShowLearningMenu] = React.useState(false);
   const [showUserMenu, setShowUserMenu] = React.useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = React.useState(false);
   
   const t = useTranslation(currentLanguage);
   const { signOut } = useAuth();
@@ -277,14 +278,58 @@ export default function Header({
 
           {/* Enhanced Right side controls */}
           <div className="hidden xl:flex items-center space-x-4">
-            <LanguageSelector 
-              currentLanguage={currentLanguage}
-              onLanguageChange={(language) => {
-                const event = new CustomEvent('languageChange', { detail: language });
-                window.dispatchEvent(event);
-              }}
-            />
-            <ThemeSwitcher currentTheme={currentTheme} onThemeChange={onThemeChange} />
+            {/* Settings Dropdown */}
+            <div className="relative">
+              <motion.button
+                onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+                className="p-4 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-700 transition-all duration-300 shadow-lg hover:shadow-xl group"
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Settings className="w-6 h-6 text-gray-600 dark:text-gray-300 group-hover:text-gray-800 dark:group-hover:text-gray-100 transition-colors" />
+              </motion.button>
+
+              <AnimatePresence>
+                {showSettingsMenu && (
+                  <motion.div
+                    className="absolute top-full right-0 mt-3 w-80 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-4 overflow-hidden"
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Settings</h3>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Language
+                          </label>
+                          <LanguageSelector 
+                            currentLanguage={currentLanguage}
+                            onLanguageChange={(language) => {
+                              const event = new CustomEvent('languageChange', { detail: language });
+                              window.dispatchEvent(event);
+                            }}
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Theme
+                          </label>
+                          <ThemeSwitcher currentTheme={currentTheme} onThemeChange={onThemeChange} />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             
             {user ? (
               <div className="relative">
@@ -497,10 +542,17 @@ export default function Header({
                     </div>
                   </div>
 
-                  {/* Mobile Controls - Enhanced with Better Spacing */}
-                  <div className="px-8 pt-6 border-t border-gray-200/50 dark:border-gray-700/50">
-                    <div className="flex flex-col space-y-4">
-                      <div className="flex items-center justify-between">
+                  {/* Mobile Settings Section */}
+                  <div className="px-8">
+                    <div className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4 flex items-center space-x-2">
+                      <Settings className="w-4 h-4" />
+                      <span>Settings</span>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Language
+                        </label>
                         <LanguageSelector 
                           currentLanguage={currentLanguage}
                           onLanguageChange={(language) => {
@@ -508,61 +560,70 @@ export default function Header({
                             window.dispatchEvent(event);
                           }}
                         />
-                        <ThemeSwitcher currentTheme={currentTheme} onThemeChange={onThemeChange} />
                       </div>
                       
-                      {user ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center space-x-3 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-2xl">
-                            <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
-                              <span className="font-semibold text-primary-600 dark:text-primary-400">
-                                {user.name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-semibold text-gray-900 dark:text-white">{user.name}</div>
-                              <div className="text-sm text-gray-600 dark:text-gray-400">{user.email}</div>
-                            </div>
-                          </div>
-                          <motion.button 
-                            onClick={handleSignOut}
-                            className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-300"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            <LogOut className="w-5 h-5" />
-                            <span className="font-semibold">Sign Out</span>
-                          </motion.button>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <motion.button 
-                            onClick={() => {
-                              onAuthClick('signin');
-                              setIsMenuOpen(false);
-                            }}
-                            className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl border-2 border-primary-200 dark:border-primary-700 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all duration-300"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            <User className="w-5 h-5" />
-                            <span className="font-semibold">Sign In</span>
-                          </motion.button>
-                          <motion.button 
-                            onClick={() => {
-                              onAuthClick('signup');
-                              setIsMenuOpen(false);
-                            }}
-                            className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl bg-primary-600 text-white hover:bg-primary-700 transition-all duration-300 shadow-lg"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            <Sparkles className="w-5 h-5" />
-                            <span className="font-semibold">Get Started</span>
-                          </motion.button>
-                        </div>
-                      )}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Theme
+                        </label>
+                        <ThemeSwitcher currentTheme={currentTheme} onThemeChange={onThemeChange} />
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Mobile User Section */}
+                  <div className="px-8 pt-6 border-t border-gray-200/50 dark:border-gray-700/50">
+                    {user ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-3 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-2xl">
+                          <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
+                            <span className="font-semibold text-primary-600 dark:text-primary-400">
+                              {user.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-900 dark:text-white">{user.name}</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">{user.email}</div>
+                          </div>
+                        </div>
+                        <motion.button 
+                          onClick={handleSignOut}
+                          className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-300"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <LogOut className="w-5 h-5" />
+                          <span className="font-semibold">Sign Out</span>
+                        </motion.button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <motion.button 
+                          onClick={() => {
+                            onAuthClick('signin');
+                            setIsMenuOpen(false);
+                          }}
+                          className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl border-2 border-primary-200 dark:border-primary-700 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all duration-300"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <User className="w-5 h-5" />
+                          <span className="font-semibold">Sign In</span>
+                        </motion.button>
+                        <motion.button 
+                          onClick={() => {
+                            onAuthClick('signup');
+                            setIsMenuOpen(false);
+                          }}
+                          className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl bg-primary-600 text-white hover:bg-primary-700 transition-all duration-300 shadow-lg"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <Sparkles className="w-5 h-5" />
+                          <span className="font-semibold">Get Started</span>
+                        </motion.button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Bottom Padding for Better Scrolling */}
