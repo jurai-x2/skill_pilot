@@ -169,26 +169,38 @@ export const useAuth = () => {
 
     initializeAuth();
 
-    // Set up auth state change listener
-    const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
+    // Set up auth state change listener - use supabase.auth instead of auth
+    let subscription: any = null;
+    
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (!mounted) return;
 
-      if (event === 'SIGNED_IN' && session?.user) {
-        await loadUserProfile(session.user);
-      } else if (event === 'SIGNED_OUT') {
-        setAuthState(prev => ({
-          ...prev,
-          user: null,
-          session: null,
-          loading: false,
-          error: null
-        }));
+          if (event === 'SIGNED_IN' && session?.user) {
+            await loadUserProfile(session.user);
+          } else if (event === 'SIGNED_OUT') {
+            setAuthState(prev => ({
+              ...prev,
+              user: null,
+              session: null,
+              loading: false,
+              error: null
+            }));
+          }
+        });
+        
+        subscription = authSubscription;
+      } catch (error: any) {
+        console.error('Auth state change listener error:', error);
       }
-    });
+    }
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 
