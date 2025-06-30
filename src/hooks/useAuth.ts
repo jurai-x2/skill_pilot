@@ -212,10 +212,7 @@ export const useAuth = () => {
     setAuthState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      const { data, error } = await auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await auth.signIn(email, password);
 
       if (error) throw error;
 
@@ -223,18 +220,18 @@ export const useAuth = () => {
         await loadUserProfile(data.user);
       }
 
-      return { data, error: null };
+      return { success: true, data, error: null };
     } catch (error: any) {
       setAuthState(prev => ({
         ...prev,
         error: error.message,
         loading: false
       }));
-      return { data: null, error };
+      return { success: false, data: null, error };
     }
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, userData: { name: string }) => {
     if (!isSupabaseConfigured()) {
       throw new Error('Supabase not configured');
     }
@@ -242,43 +239,22 @@ export const useAuth = () => {
     setAuthState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      const { data, error } = await auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-          },
-        },
-      });
+      const { data, error } = await auth.signUp(email, password, userData);
 
       if (error) throw error;
 
       if (data.user) {
-        // Create user profile
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: data.user.id,
-            email: data.user.email!,
-            name,
-          });
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-        }
-
         await loadUserProfile(data.user);
       }
 
-      return { data, error: null };
+      return { success: true, data, error: null };
     } catch (error: any) {
       setAuthState(prev => ({
         ...prev,
         error: error.message,
         loading: false
       }));
-      return { data: null, error };
+      return { success: false, data: null, error };
     }
   };
 
