@@ -5,10 +5,11 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 console.log('🔧 Supabase Environment Check:', {
-  url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'MISSING',
+  url: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING',
   key: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'MISSING',
   urlType: typeof supabaseUrl,
-  keyType: typeof supabaseAnonKey
+  keyType: typeof supabaseAnonKey,
+  fullUrl: supabaseUrl // Show full URL for debugging
 });
 
 // Check if Supabase is properly configured
@@ -31,8 +32,50 @@ export const isSupabaseConfigured = () => {
   return isConfigured;
 };
 
+// Test Supabase connectivity
+const testSupabaseConnectivity = async () => {
+  if (!isSupabaseConfigured()) {
+    console.log('⚠️ Skipping connectivity test - Supabase not configured');
+    return false;
+  }
+
+  try {
+    console.log('🔍 Testing Supabase connectivity...');
+    const testUrl = `${supabaseUrl}/auth/v1/settings`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    
+    const response = await fetch(testUrl, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        'apikey': supabaseAnonKey,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      console.log('✅ Supabase connectivity test passed');
+      return true;
+    } else {
+      console.error('❌ Supabase connectivity test failed:', response.status, response.statusText);
+      return false;
+    }
+  } catch (error: any) {
+    console.error('❌ Supabase connectivity test error:', error.message);
+    if (error.name === 'AbortError') {
+      console.error('❌ Supabase server is not responding (timeout)');
+    }
+    return false;
+  }
+};
+
 // Create Supabase client - only if configured
 let supabase: any = null;
+let connectivityTested = false;
 
 if (isSupabaseConfigured()) {
   try {
@@ -42,36 +85,61 @@ if (isSupabaseConfigured()) {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-        flowType: 'pkce' // Use PKCE flow for better performance
+        flowType: 'pkce'
       },
       global: {
         headers: {
           'x-client-info': 'skillpilot-web'
         }
+      },
+      // Add realtime configuration to prevent connection issues
+      realtime: {
+        params: {
+          eventsPerSecond: 2
+        }
       }
     });
     console.log('✅ Supabase client created successfully');
+    
+    // Test connectivity in background
+    testSupabaseConnectivity().then(isConnected => {
+      connectivityTested = true;
+      if (!isConnected) {
+        console.error('❌ Supabase server is not reachable. Please check:');
+        console.error('1. Your internet connection');
+        console.error('2. Supabase project status at https://supabase.com/dashboard');
+        console.error('3. Environment variables in .env file');
+        console.error('4. Restart your development server after changing .env');
+      }
+    });
   } catch (error) {
     console.error('❌ Failed to create Supabase client:', error);
   }
 } else {
   console.warn('⚠️ Supabase not configured - running in demo mode');
+  console.warn('Please check your .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set correctly');
 }
 
 export { supabase };
 
-// Auth helpers with better error handling and timeouts
+// Helper function to create timeout promise
+const createTimeoutPromise = (ms: number, operation: string) => {
+  return new Promise((_, reject) => 
+    setTimeout(() => reject(new Error(`${operation} timed out after ${ms}ms`)), ms)
+  );
+};
+
+// Auth helpers with better error handling and more reasonable timeouts
 export const auth = {
   signUp: async (email: string, password: string, userData?: any) => {
     if (!supabase) {
       console.error('❌ Auth Error: Supabase not configured');
-      throw new Error('Authentication service not available');
+      throw new Error('Authentication service not available. Please check your Supabase configuration.');
     }
     
     try {
       console.log('🔐 Attempting sign up for:', email);
       
-      // Add timeout wrapper
       const signUpPromise = supabase.auth.signUp({
         email,
         password,
@@ -81,10 +149,7 @@ export const auth = {
         }
       });
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Sign up request timed out')), 15000)
-      );
-
+      const timeoutPromise = createTimeoutPromise(10000, 'Sign up');
       const { data, error } = await Promise.race([signUpPromise, timeoutPromise]) as any;
       
       if (error) {
@@ -95,14 +160,16 @@ export const auth = {
       
       return { data, error };
     } catch (err: any) {
-      console.error('❌ Sign up network error:', err);
+      console.error('❌ Sign up error:', err);
+      
+      let errorMessage = 'Network error during sign up. Please try again.';
+      if (err.message.includes('timed out')) {
+        errorMessage = 'Sign up is taking longer than expected. Please check your internet connection and try again.';
+      }
+      
       return { 
         data: null, 
-        error: { 
-          message: err.message === 'Sign up request timed out' 
-            ? 'Sign up is taking longer than expected. Please try again.' 
-            : 'Network error during sign up. Please check your connection and try again.'
-        } 
+        error: { message: errorMessage }
       };
     }
   },
@@ -110,22 +177,18 @@ export const auth = {
   signIn: async (email: string, password: string) => {
     if (!supabase) {
       console.error('❌ Auth Error: Supabase not configured');
-      throw new Error('Authentication service not available');
+      throw new Error('Authentication service not available. Please check your Supabase configuration.');
     }
     
     try {
       console.log('🔐 Attempting sign in for:', email);
       
-      // Add timeout wrapper
       const signInPromise = supabase.auth.signInWithPassword({
         email,
         password
       });
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Sign in request timed out')), 15000)
-      );
-
+      const timeoutPromise = createTimeoutPromise(8000, 'Sign in');
       const { data, error } = await Promise.race([signInPromise, timeoutPromise]) as any;
       
       if (error) {
@@ -136,14 +199,16 @@ export const auth = {
       
       return { data, error };
     } catch (err: any) {
-      console.error('❌ Sign in network error:', err);
+      console.error('❌ Sign in error:', err);
+      
+      let errorMessage = 'Network error during sign in. Please try again.';
+      if (err.message.includes('timed out')) {
+        errorMessage = 'Sign in is taking longer than expected. Please check your internet connection and try again.';
+      }
+      
       return { 
         data: null, 
-        error: { 
-          message: err.message === 'Sign in request timed out' 
-            ? 'Sign in is taking longer than expected. Please try again.' 
-            : 'Network error during sign in. Please check your connection and try again.'
-        } 
+        error: { message: errorMessage }
       };
     }
   },
@@ -157,12 +222,8 @@ export const auth = {
     try {
       console.log('🔐 Signing out...');
       
-      // Add timeout wrapper
       const signOutPromise = supabase.auth.signOut();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Sign out request timed out')), 5000)
-      );
-
+      const timeoutPromise = createTimeoutPromise(3000, 'Sign out');
       const { error } = await Promise.race([signOutPromise, timeoutPromise]) as any;
       
       if (error) {
@@ -173,7 +234,7 @@ export const auth = {
       
       return { error };
     } catch (err: any) {
-      console.error('❌ Sign out network error:', err);
+      console.error('❌ Sign out error:', err);
       return { error: { message: 'Network error during sign out' } };
     }
   },
@@ -190,21 +251,20 @@ export const auth = {
         redirectTo: `${window.location.origin}/reset-password`
       });
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Password reset request timed out')), 10000)
-      );
-
+      const timeoutPromise = createTimeoutPromise(8000, 'Password reset');
       const { data, error } = await Promise.race([resetPromise, timeoutPromise]) as any;
       return { data, error };
     } catch (err: any) {
-      console.error('❌ Password reset network error:', err);
+      console.error('❌ Password reset error:', err);
+      
+      let errorMessage = 'Network error during password reset';
+      if (err.message.includes('timed out')) {
+        errorMessage = 'Password reset is taking longer than expected. Please try again.';
+      }
+      
       return { 
         data: null, 
-        error: { 
-          message: err.message === 'Password reset request timed out' 
-            ? 'Password reset is taking longer than expected. Please try again.' 
-            : 'Network error during password reset'
-        } 
+        error: { message: errorMessage }
       };
     }
   },
@@ -219,11 +279,9 @@ export const auth = {
       console.log('👤 Getting current user...');
       
       const userPromise = supabase.auth.getUser();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Get user request timed out')), 5000)
-      );
-
+      const timeoutPromise = createTimeoutPromise(3000, 'Get user');
       const result = await Promise.race([userPromise, timeoutPromise]) as any;
+      
       console.log('👤 Current user result:', result.data.user ? 'Found user' : 'No user');
       return result;
     } catch (err: any) {
@@ -242,15 +300,20 @@ export const auth = {
       console.log('🔑 Getting current session...');
       
       const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Get session request timed out')), 3000)
-      );
-
+      const timeoutPromise = createTimeoutPromise(2000, 'Get session');
       const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
+      
       console.log('🔑 Session result:', result.data.session ? 'Found session' : 'No session');
       return result;
     } catch (err: any) {
       console.error('❌ Get session error:', err);
+      
+      // Don't treat session timeout as a critical error
+      if (err.message.includes('timed out')) {
+        console.log('⏰ Session check timed out - continuing without session');
+        return { data: { session: null }, error: null };
+      }
+      
       return { data: { session: null }, error: { message: 'Failed to get session' } };
     }
   }
@@ -274,10 +337,7 @@ export const db = {
         .eq('id', id)
         .single();
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database request timed out')), 5000)
-      );
-
+      const timeoutPromise = createTimeoutPromise(4000, 'Get user');
       const { data, error } = await Promise.race([userPromise, timeoutPromise]) as any;
       
       if (error) {
@@ -288,7 +348,7 @@ export const db = {
       
       return { data, error };
     } catch (err: any) {
-      console.error('❌ Get user network error:', err);
+      console.error('❌ Get user error:', err);
       return { data: null, error: { message: 'Network error fetching user' } };
     }
   },
@@ -308,10 +368,7 @@ export const db = {
         .select()
         .single();
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database update timed out')), 5000)
-      );
-
+      const timeoutPromise = createTimeoutPromise(4000, 'Update user');
       const { data, error } = await Promise.race([updatePromise, timeoutPromise]) as any;
       return { data, error };
     } catch (err: any) {
@@ -347,10 +404,7 @@ export const db = {
         .select()
         .single();
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database save timed out')), 5000)
-      );
-
+      const timeoutPromise = createTimeoutPromise(4000, 'Save quiz result');
       const { data, error } = await Promise.race([savePromise, timeoutPromise]) as any;
       return { data, error };
     } catch (err: any) {
@@ -373,10 +427,7 @@ export const db = {
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database fetch timed out')), 5000)
-      );
-
+      const timeoutPromise = createTimeoutPromise(4000, 'Get quiz results');
       const { data, error } = await Promise.race([getPromise, timeoutPromise]) as any;
       return { data, error };
     } catch (err: any) {

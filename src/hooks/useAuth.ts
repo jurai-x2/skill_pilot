@@ -73,20 +73,10 @@ export const useAuth = () => {
       }));
 
       // Load profile with timeout to prevent hanging
-      const profilePromise = supabase
-        .from('users')
-        .select('*')
-        .eq('id', supabaseUser.id)
-        .single();
-
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile load timeout')), 3000)
-      );
-
       try {
-        const { data: profile, error } = await Promise.race([profilePromise, timeoutPromise]) as any;
+        const { data: profile, error } = await db.getUser(supabaseUser.id);
 
-        if (error && error.code !== 'PGRST116') {
+        if (error && error.message !== 'No rows returned') {
           console.error('❌ Profile fetch error:', error);
           // Don't throw error, create a basic user instead
         }
@@ -129,34 +119,36 @@ export const useAuth = () => {
           }));
 
           // Try to create profile in background (non-blocking)
-          supabase
-            .from('users')
-            .insert({
-              id: supabaseUser.id,
-              email: supabaseUser.email || '',
-              name: basicUser.name,
-              avatar_url: basicUser.avatar_url,
-              language: 'en',
-              level: 1,
-              xp: 0,
-              total_xp: 0,
-              streak: 0,
-              completed_lessons: 0,
-              study_hours: 0,
-              weekly_goal: 10,
-              followers: 0,
-              following: 0,
-              joined_at: new Date().toISOString(),
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .then(({ error: createError }) => {
-              if (createError) {
-                console.log('⚠️ Background profile creation failed:', createError.message);
-              } else {
-                console.log('✅ Background profile creation successful');
-              }
-            });
+          if (supabase) {
+            supabase
+              .from('users')
+              .insert({
+                id: supabaseUser.id,
+                email: supabaseUser.email || '',
+                name: basicUser.name,
+                avatar_url: basicUser.avatar_url,
+                language: 'en',
+                level: 1,
+                xp: 0,
+                total_xp: 0,
+                streak: 0,
+                completed_lessons: 0,
+                study_hours: 0,
+                weekly_goal: 10,
+                followers: 0,
+                following: 0,
+                joined_at: new Date().toISOString(),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .then(({ error: createError }) => {
+                if (createError) {
+                  console.log('⚠️ Background profile creation failed:', createError.message);
+                } else {
+                  console.log('✅ Background profile creation successful');
+                }
+              });
+          }
 
           return;
         }
@@ -171,9 +163,9 @@ export const useAuth = () => {
           ...prev,
           user
         }));
-      } catch (timeoutError) {
-        console.log('⏰ Profile load timeout, using basic user');
-        // Create basic user on timeout
+      } catch (profileError: any) {
+        console.log('⏰ Profile load error, using basic user:', profileError.message);
+        // Create basic user on error
         const basicUser: User = {
           id: supabaseUser.id,
           name: supabaseUser.user_metadata?.name || supabaseUser.user_metadata?.full_name || 'User',
@@ -261,7 +253,7 @@ export const useAuth = () => {
             console.log('⏰ Auth initialization timeout - setting loading to false');
             setAuthState(prev => ({ ...prev, loading: false }));
           }
-        }, 2000); // Reduced from 5000ms to 2000ms
+        }, 1500); // Reduced timeout
 
         if (!isSupabaseConfigured()) {
           console.log('⚠️ Supabase not configured - running in demo mode');
@@ -274,30 +266,32 @@ export const useAuth = () => {
 
         console.log('🔑 Getting current session...');
         
-        // Add timeout to session check
-        const sessionPromise = auth.getSession();
-        const sessionTimeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session check timeout')), 2000)
-        );
+        try {
+          const { data: { session }, error } = await auth.getSession();
 
-        const { data: { session }, error } = await Promise.race([sessionPromise, sessionTimeoutPromise]) as any;
+          clearTimeout(timeoutId);
+          
+          if (!mounted) return;
 
-        clearTimeout(timeoutId);
-        
-        if (!mounted) return;
+          if (error) {
+            console.error('❌ Session error:', error);
+            setAuthState(prev => ({ ...prev, loading: false }));
+            return;
+          }
 
-        if (error) {
-          console.error('❌ Session error:', error);
-          setAuthState(prev => ({ ...prev, loading: false }));
-          return;
-        }
-
-        if (session?.user) {
-          console.log('✅ Found existing session for:', session.user.email);
-          await loadUserProfile(session.user);
-        } else {
-          console.log('ℹ️ No existing session found');
-          setAuthState(prev => ({ ...prev, loading: false }));
+          if (session?.user) {
+            console.log('✅ Found existing session for:', session.user.email);
+            await loadUserProfile(session.user);
+          } else {
+            console.log('ℹ️ No existing session found');
+            setAuthState(prev => ({ ...prev, loading: false }));
+          }
+        } catch (sessionError: any) {
+          clearTimeout(timeoutId);
+          console.log('⏰ Session check failed, continuing without session:', sessionError.message);
+          if (mounted) {
+            setAuthState(prev => ({ ...prev, loading: false }));
+          }
         }
       } catch (error: any) {
         console.error('❌ Auth initialization error:', error);
@@ -364,13 +358,7 @@ export const useAuth = () => {
     setAuthState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      // Add timeout to sign in
-      const signInPromise = auth.signIn(email, password);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Sign in timeout')), 10000)
-      );
-
-      const { data, error } = await Promise.race([signInPromise, timeoutPromise]) as any;
+      const { data, error } = await auth.signIn(email, password);
 
       if (error) throw error;
 
@@ -408,13 +396,7 @@ export const useAuth = () => {
     setAuthState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      // Add timeout to sign up
-      const signUpPromise = auth.signUp(email, password, userData);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Sign up timeout')), 10000)
-      );
-
-      const { data, error } = await Promise.race([signUpPromise, timeoutPromise]) as any;
+      const { data, error } = await auth.signUp(email, password, userData);
 
       if (error) throw error;
 
