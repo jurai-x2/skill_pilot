@@ -34,13 +34,13 @@ export default function Dashboard({ user, onViewRoadmap, currentLanguage }: Dash
     {
       icon: Zap,
       label: t('dashboard.totalXP'),
-      value: user.totalXp,
+      value: user.total_xp,
       color: 'from-accent-500 to-accent-600'
     },
     {
       icon: BookOpen,
       label: t('dashboard.lessonsCompleted'),
-      value: user.completedLessons,
+      value: user.completed_lessons,
       color: 'from-secondary-500 to-secondary-600'
     },
     {

@@ -22,7 +22,7 @@ export const useAuth = () => {
 
   const loadUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
-      if (!isSupabaseConfigured()) {
+      if (!isSupabaseConfigured() || !supabase) {
         setAuthState(prev => ({
           ...prev,
           user: null,
@@ -51,9 +51,9 @@ export const useAuth = () => {
       const user: User = profile || {
         id: supabaseUser.id,
         email: supabaseUser.email || '',
-        name: supabaseUser.user_metadata?.name || '',
+        name: supabaseUser.user_metadata?.name || supabaseUser.user_metadata?.full_name || 'User',
         avatar_url: supabaseUser.user_metadata?.avatar_url || null,
-        career_path: null,
+        careerPath: null,
         level: 1,
         xp: 0,
         total_xp: 0,
@@ -73,7 +73,8 @@ export const useAuth = () => {
         followers: 0,
         following: 0,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        certificates: []
       };
 
       setAuthState(prev => ({
@@ -98,19 +99,6 @@ export const useAuth = () => {
 
     const initializeAuth = async () => {
       try {
-        // Dev mode fallback: skip auth if running in Bolt or localhost
-        if (import.meta.env.MODE === 'development') {
-          console.warn('Running in development mode — skipping Supabase auth.');
-          setAuthState({
-            user: null,
-            session: null,
-            loading: false,
-            error: null,
-            isConfigured: false,
-          });
-          return;
-        }
-
         if (!isSupabaseConfigured()) {
           console.warn('Supabase not configured. Running in demo mode.');
           setAuthState({
@@ -169,13 +157,15 @@ export const useAuth = () => {
 
     initializeAuth();
 
-    // Set up auth state change listener - use supabase.auth instead of auth
+    // Set up auth state change listener
     let subscription: any = null;
     
     if (isSupabaseConfigured() && supabase) {
       try {
         const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
           if (!mounted) return;
+
+          console.log('Auth state change:', event, session?.user?.email);
 
           if (event === 'SIGNED_IN' && session?.user) {
             await loadUserProfile(session.user);
@@ -243,9 +233,8 @@ export const useAuth = () => {
 
       if (error) throw error;
 
-      if (data.user) {
-        await loadUserProfile(data.user);
-      }
+      // For signup, we don't automatically load profile since email verification might be required
+      setAuthState(prev => ({ ...prev, loading: false }));
 
       return { success: true, data, error: null };
     } catch (error: any) {
