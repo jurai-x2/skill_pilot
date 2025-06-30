@@ -152,6 +152,11 @@ export default function LearningFeed({ isOpen, onClose, currentLanguage = 'en' }
     });
   };
 
+  const handleViewClick = (item: LearningFeedType) => {
+    // Always redirect to the specified YouTube video regardless of the item's URL
+    window.open('https://youtu.be/pKd0Rpw7O48?si=ZcGJOGzKHebi9HVd', '_blank');
+  };
+
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'video': return Play;
@@ -186,11 +191,6 @@ export default function LearningFeed({ isOpen, onClose, currentLanguage = 'en' }
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return `${hours}h ${remainingMinutes}m`;
-  };
-
-  const handleViewClick = (item: LearningFeedType) => {
-    // Always redirect to the specified YouTube video regardless of the item's URL
-    window.open('https://youtu.be/CgkZ7MvWUAA?si=0P5jBlDjXBPwDxVo', '_blank');
   };
 
   if (!isOpen) return null;
