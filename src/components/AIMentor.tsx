@@ -1,20 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  MessageCircle, 
-  Send, 
-  Paperclip, 
-  X, 
-  Bot, 
+import { motion } from 'framer-motion';
+import {
+  MessageCircle,
+  Send,
+  Paperclip,
+  X,
+  Bot,
   User,
   FileText,
   Image,
   Code,
-  Download,
   Sparkles,
-  Loader,
-  RefreshCw,
-  AlertTriangle
+  Loader
 } from 'lucide-react';
 import { ChatMessage, FileAttachment } from '../types';
 import { useTranslation } from '../utils/translations';
@@ -27,24 +24,20 @@ interface AIMentorProps {
 }
 
 export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AIMentorProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      content: "Hi! I'm your AI mentor. I can help you with coding questions, career advice, resume feedback, and more. You can also upload files for me to review!",
-      sender: 'ai',
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([{
+    id: '1',
+    content: "Hi! I'm your AI mentor. I can help you with coding questions, career advice, resume feedback, and more. You can also upload files for me to review!",
+    sender: 'ai',
+    timestamp: new Date()
+  }]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const t = useTranslation(currentLanguage);
   const { user } = useAuth();
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -65,39 +58,42 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
     setAttachments([]);
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        content: generateAIResponse(inputMessage, attachments),
+    try {
+      const response = await fetch("https://your-bolt-url.bolt.run/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: inputMessage }],
+          assistantId: "mentor_ai_001",
+          threadId: "thread_" + (user?.id || "guest"),
+          userId: user?.id || "guest"
+        })
+      });
+
+      const data = await response.json();
+      const aiReply = data.message?.content?.[0]?.text?.value || "I couldn’t respond. Please try again.";
+
+      const aiMessage: ChatMessage = {
+        id: Date.now().toString(),
+        content: aiReply,
         sender: 'ai',
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, aiResponse]);
+
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error("AI Error", error);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        content: "❌ Couldn’t reach AI.",
+        sender: "ai",
+        timestamp: new Date()
+      }]);
+    } finally {
       setIsTyping(false);
-    }, 2000);
-  };
-
-  const generateAIResponse = (message: string, files: FileAttachment[]): string => {
-    if (files.length > 0) {
-      return t('aiMentor.fileAnalysis');
     }
-
-    const lowerMessage = message.toLowerCase();
-    
-    if (lowerMessage.includes('resume')) {
-      return t('aiMentor.resumeHelp');
-    }
-    
-    if (lowerMessage.includes('career') || lowerMessage.includes('job')) {
-      return t('aiMentor.careerHelp');
-    }
-    
-    if (lowerMessage.includes('code') || lowerMessage.includes('programming')) {
-      return t('aiMentor.codingHelp');
-    }
-    
-    return t('aiMentor.generalHelp');
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,27 +130,20 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const retryInitialization = () => {
-    setError(null);
-    // In a real implementation, this would retry the initialization
-  };
-
   if (!isOpen) return null;
 
   return (
-    <motion.div
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+    <motion.div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
       <motion.div
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col transition-colors"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col"
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
@@ -165,68 +154,40 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
               <p className="text-sm text-gray-600 dark:text-gray-400">{t('aiMentor.subtitle')}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
             <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`flex items-start space-x-3 max-w-[80%] ${
-                message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''
-              }`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  message.sender === 'user' 
-                    ? 'bg-primary-500' 
-                    : 'bg-gradient-to-br from-secondary-500 to-accent-500'
-                }`}>
-                  {message.sender === 'user' ? (
-                    <User className="w-4 h-4 text-white" />
-                  ) : (
-                    <Sparkles className="w-4 h-4 text-white" />
-                  )}
+            <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`flex items-start space-x-3 max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${message.sender === 'user' ? 'bg-primary-500' : 'bg-gradient-to-br from-secondary-500 to-accent-500'}`}>
+                  {message.sender === 'user' ? <User className="w-4 h-4 text-white" /> : <Sparkles className="w-4 h-4 text-white" />}
                 </div>
-                <div className={`rounded-2xl p-4 ${
-                  message.sender === 'user'
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                }`}>
+                <div className={`rounded-2xl p-4 ${message.sender === 'user' ? 'bg-primary-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'}`}>
                   <p className="whitespace-pre-wrap">{message.content}</p>
                   {message.attachments && (
                     <div className="mt-3 space-y-2">
                       {message.attachments.map((attachment) => {
                         const FileIcon = getFileIcon(attachment.type);
                         return (
-                          <div
-                            key={attachment.id}
-                            className="flex items-center space-x-2 p-2 bg-white bg-opacity-20 rounded-lg"
-                          >
+                          <div key={attachment.id} className="flex items-center space-x-2 p-2 bg-white bg-opacity-20 rounded-lg">
                             <FileIcon className="w-4 h-4" />
                             <span className="text-sm">{attachment.name}</span>
-                            <span className="text-xs opacity-75">
-                              ({formatFileSize(attachment.size)})
-                            </span>
+                            <span className="text-xs opacity-75">({formatFileSize(attachment.size)})</span>
                           </div>
                         );
                       })}
                     </div>
                   )}
-                  <p className="text-xs opacity-75 mt-2">
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
+                  <p className="text-xs opacity-75 mt-2">{message.timestamp.toLocaleTimeString()}</p>
                 </div>
               </div>
             </div>
           ))}
-          
+
           {isTyping && (
             <div className="flex justify-start">
               <div className="flex items-start space-x-3">
@@ -236,34 +197,27 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
                 <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl p-4">
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce delay-75" />
+                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce delay-150" />
                   </div>
                 </div>
               </div>
             </div>
           )}
-          
+
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Attachments Preview */}
         {attachments.length > 0 && (
           <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
             <div className="flex flex-wrap gap-2">
               {attachments.map((attachment) => {
                 const FileIcon = getFileIcon(attachment.type);
                 return (
-                  <div
-                    key={attachment.id}
-                    className="flex items-center space-x-2 bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-600"
-                  >
+                  <div key={attachment.id} className="flex items-center space-x-2 bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-600">
                     <FileIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                     <span className="text-sm text-gray-700 dark:text-gray-300">{attachment.name}</span>
-                    <button
-                      onClick={() => removeAttachment(attachment.id)}
-                      className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
-                    >
+                    <button onClick={() => removeAttachment(attachment.id)} className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
@@ -273,7 +227,6 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
           </div>
         )}
 
-        {/* Input */}
         <div className="p-6 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-end space-x-3">
             <div className="flex-1">
@@ -303,7 +256,7 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-3 text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-xl transition-colors"
+                className="p-3 text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-xl"
                 title={t('aiMentor.uploadFile')}
                 disabled={isTyping}
               >
@@ -312,7 +265,7 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
               <button
                 onClick={handleSendMessage}
                 disabled={(!inputMessage.trim() && attachments.length === 0) || isTyping}
-                className="p-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+                className="p-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
               >
                 {isTyping ? (
                   <Loader className="w-5 h-5 animate-spin" />
