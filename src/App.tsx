@@ -15,6 +15,7 @@ import LiveEvents from './components/LiveEvents';
 import LearningFeed from './components/LearningFeed';
 import Gamification from './components/Gamification';
 import PersonalizedVideos from './components/PersonalizedVideos';
+import Certificates from './components/Certificates';
 import AuthModal from './components/Auth/AuthModal';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { QuizResult, Lesson, Project } from './types';
@@ -39,6 +40,7 @@ function App() {
   const [showLearningFeed, setShowLearningFeed] = useState(false);
   const [showGamification, setShowGamification] = useState(false);
   const [showPersonalizedVideos, setShowPersonalizedVideos] = useState(false);
+  const [showCertificates, setShowCertificates] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [theme, setTheme] = useState<Theme>('system');
   
@@ -694,6 +696,7 @@ KEY: Learn the differences between web React and React Native, especially regard
         onOpenLearningFeed={() => setShowLearningFeed(true)}
         onOpenGamification={() => setShowGamification(true)}
         onOpenPersonalizedVideos={() => setShowPersonalizedVideos(true)}
+        onOpenCertificates={() => setShowCertificates(true)}
         currentTheme={theme}
         onThemeChange={setTheme}
         currentLanguage={currentLanguage}
@@ -782,6 +785,14 @@ KEY: Learn the differences between web React and React Native, especially regard
           user={user}
           isOpen={showPersonalizedVideos}
           onClose={() => setShowPersonalizedVideos(false)}
+          currentLanguage={currentLanguage}
+        />
+      )}
+
+      {user && (
+        <Certificates
+          isOpen={showCertificates}
+          onClose={() => setShowCertificates(false)}
           currentLanguage={currentLanguage}
         />
       )}

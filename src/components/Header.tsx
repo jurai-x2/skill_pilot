@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, User, Menu, X, MessageCircle, FileText, Users, DollarSign, BookOpen, Upload, Calendar, Play, Trophy, Video, ChevronDown, Sparkles, Zap, Globe, LogOut, Settings } from 'lucide-react';
+import { Brain, User, Menu, X, MessageCircle, FileText, Users, DollarSign, BookOpen, Upload, Calendar, Play, Trophy, Video, ChevronDown, Sparkles, Zap, Globe, LogOut, Settings, Award } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSelector from './LanguageSelector';
@@ -22,6 +22,7 @@ interface HeaderProps {
   onOpenLearningFeed: () => void;
   onOpenGamification: () => void;
   onOpenPersonalizedVideos: () => void;
+  onOpenCertificates: () => void;
   currentTheme: Theme;
   onThemeChange: (theme: Theme) => void;
   currentLanguage: string;
@@ -42,6 +43,7 @@ export default function Header({
   onOpenLearningFeed,
   onOpenGamification,
   onOpenPersonalizedVideos,
+  onOpenCertificates,
   currentTheme,
   onThemeChange,
   currentLanguage,
@@ -77,6 +79,7 @@ export default function Header({
     { name: t('tools.projectSubmit'), icon: Upload, action: onOpenProjectSubmission, color: 'from-amber-500 to-orange-500', description: 'Submit projects' },
     { name: t('tools.achievements'), icon: Trophy, action: onOpenGamification, color: 'from-yellow-500 to-amber-500', description: 'Track progress' },
     { name: t('tools.monetization'), icon: DollarSign, action: onOpenMonetizationGuide, color: 'from-emerald-500 to-green-500', description: 'Earn money' },
+    { name: 'Certificates', icon: Award, action: onOpenCertificates, color: 'from-amber-500 to-red-500', description: 'View & download' },
   ];
 
   const handleSignOut = async () => {
