@@ -109,7 +109,7 @@ export default function LearningFeed({ isOpen, onClose, currentLanguage = 'en' }
     {
       id: '6',
       title: 'CSS Grid Complete Guide',
-      description: 'Master CSS Grid layout with practical examples and real-world projects.',
+      description: 'Sell website templates, UI components, and code snippets',
       type: 'tutorial',
       url: 'https://css-tricks.com/snippets/css/complete-guide-grid/',
       provider: 'CSS-Tricks',
@@ -186,6 +186,11 @@ export default function LearningFeed({ isOpen, onClose, currentLanguage = 'en' }
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return `${hours}h ${remainingMinutes}m`;
+  };
+
+  const handleViewClick = (item: LearningFeedType) => {
+    // Always redirect to the specified YouTube video regardless of the item's URL
+    window.open('https://youtu.be/CgkZ7MvWUAA?si=0P5jBlDjXBPwDxVo', '_blank');
   };
 
   if (!isOpen) return null;
@@ -357,7 +362,7 @@ export default function LearningFeed({ isOpen, onClose, currentLanguage = 'en' }
                             <div className="flex items-center justify-between">
                               <span className="text-sm text-gray-600 dark:text-gray-400">{item.provider}</span>
                               <button
-                                onClick={() => window.open(item.url, '_blank')}
+                                onClick={() => handleViewClick(item)}
                                 className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
                               >
                                 <TypeIcon className="w-4 h-4" />
@@ -439,7 +444,7 @@ export default function LearningFeed({ isOpen, onClose, currentLanguage = 'en' }
                                 <span>{item.provider}</span>
                               </div>
                               <button
-                                onClick={() => window.open(item.url, '_blank')}
+                                onClick={() => handleViewClick(item)}
                                 className="flex items-center space-x-2 px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
                               >
                                 <TypeIcon className="w-3 h-3" />
