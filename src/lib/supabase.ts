@@ -41,7 +41,13 @@ if (isSupabaseConfigured()) {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: true,
+        flowType: 'pkce' // Use PKCE flow for better performance
+      },
+      global: {
+        headers: {
+          'x-client-info': 'skillpilot-web'
+        }
       }
     });
     console.log('✅ Supabase client created successfully');
@@ -54,7 +60,7 @@ if (isSupabaseConfigured()) {
 
 export { supabase };
 
-// Auth helpers with better error handling
+// Auth helpers with better error handling and timeouts
 export const auth = {
   signUp: async (email: string, password: string, userData?: any) => {
     if (!supabase) {
@@ -64,13 +70,22 @@ export const auth = {
     
     try {
       console.log('🔐 Attempting sign up for:', email);
-      const { data, error } = await supabase.auth.signUp({
+      
+      // Add timeout wrapper
+      const signUpPromise = supabase.auth.signUp({
         email,
         password,
         options: {
-          data: userData
+          data: userData,
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Sign up request timed out')), 15000)
+      );
+
+      const { data, error } = await Promise.race([signUpPromise, timeoutPromise]) as any;
       
       if (error) {
         console.error('❌ Sign up error:', error);
@@ -79,9 +94,16 @@ export const auth = {
       }
       
       return { data, error };
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Sign up network error:', err);
-      return { data: null, error: { message: 'Network error during sign up' } };
+      return { 
+        data: null, 
+        error: { 
+          message: err.message === 'Sign up request timed out' 
+            ? 'Sign up is taking longer than expected. Please try again.' 
+            : 'Network error during sign up. Please check your connection and try again.'
+        } 
+      };
     }
   },
 
@@ -93,10 +115,18 @@ export const auth = {
     
     try {
       console.log('🔐 Attempting sign in for:', email);
-      const { data, error } = await supabase.auth.signInWithPassword({
+      
+      // Add timeout wrapper
+      const signInPromise = supabase.auth.signInWithPassword({
         email,
         password
       });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Sign in request timed out')), 15000)
+      );
+
+      const { data, error } = await Promise.race([signInPromise, timeoutPromise]) as any;
       
       if (error) {
         console.error('❌ Sign in error:', error);
@@ -105,9 +135,16 @@ export const auth = {
       }
       
       return { data, error };
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Sign in network error:', err);
-      return { data: null, error: { message: 'Network error during sign in' } };
+      return { 
+        data: null, 
+        error: { 
+          message: err.message === 'Sign in request timed out' 
+            ? 'Sign in is taking longer than expected. Please try again.' 
+            : 'Network error during sign in. Please check your connection and try again.'
+        } 
+      };
     }
   },
 
@@ -119,7 +156,14 @@ export const auth = {
     
     try {
       console.log('🔐 Signing out...');
-      const { error } = await supabase.auth.signOut();
+      
+      // Add timeout wrapper
+      const signOutPromise = supabase.auth.signOut();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Sign out request timed out')), 5000)
+      );
+
+      const { error } = await Promise.race([signOutPromise, timeoutPromise]) as any;
       
       if (error) {
         console.error('❌ Sign out error:', error);
@@ -128,7 +172,7 @@ export const auth = {
       }
       
       return { error };
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Sign out network error:', err);
       return { error: { message: 'Network error during sign out' } };
     }
@@ -141,13 +185,27 @@ export const auth = {
     
     try {
       console.log('🔐 Sending password reset for:', email);
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      
+      const resetPromise = supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`
       });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Password reset request timed out')), 10000)
+      );
+
+      const { data, error } = await Promise.race([resetPromise, timeoutPromise]) as any;
       return { data, error };
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Password reset network error:', err);
-      return { data: null, error: { message: 'Network error during password reset' } };
+      return { 
+        data: null, 
+        error: { 
+          message: err.message === 'Password reset request timed out' 
+            ? 'Password reset is taking longer than expected. Please try again.' 
+            : 'Network error during password reset'
+        } 
+      };
     }
   },
 
@@ -159,10 +217,16 @@ export const auth = {
     
     try {
       console.log('👤 Getting current user...');
-      const result = await supabase.auth.getUser();
+      
+      const userPromise = supabase.auth.getUser();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Get user request timed out')), 5000)
+      );
+
+      const result = await Promise.race([userPromise, timeoutPromise]) as any;
       console.log('👤 Current user result:', result.data.user ? 'Found user' : 'No user');
       return result;
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Get user error:', err);
       return { data: { user: null }, error: { message: 'Failed to get current user' } };
     }
@@ -176,17 +240,23 @@ export const auth = {
     
     try {
       console.log('🔑 Getting current session...');
-      const result = await supabase.auth.getSession();
+      
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Get session request timed out')), 3000)
+      );
+
+      const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
       console.log('🔑 Session result:', result.data.session ? 'Found session' : 'No session');
       return result;
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Get session error:', err);
       return { data: { session: null }, error: { message: 'Failed to get session' } };
     }
   }
 };
 
-// Database helpers with better error handling
+// Database helpers with better error handling and timeouts
 export const db = {
   // Users
   getUser: async (id: string) => {
@@ -197,11 +267,18 @@ export const db = {
     
     try {
       console.log('📊 Getting user profile for:', id);
-      const { data, error } = await supabase
+      
+      const userPromise = supabase
         .from('users')
         .select('*')
         .eq('id', id)
         .single();
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database request timed out')), 5000)
+      );
+
+      const { data, error } = await Promise.race([userPromise, timeoutPromise]) as any;
       
       if (error) {
         console.error('❌ Get user error:', error);
@@ -210,7 +287,7 @@ export const db = {
       }
       
       return { data, error };
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Get user network error:', err);
       return { data: null, error: { message: 'Network error fetching user' } };
     }
@@ -223,14 +300,21 @@ export const db = {
     
     try {
       console.log('📊 Updating user:', id);
-      const { data, error } = await supabase
+      
+      const updatePromise = supabase
         .from('users')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single();
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database update timed out')), 5000)
+      );
+
+      const { data, error } = await Promise.race([updatePromise, timeoutPromise]) as any;
       return { data, error };
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Update user error:', err);
       return { data: null, error: { message: 'Network error updating user' } };
     }
@@ -244,7 +328,8 @@ export const db = {
     
     try {
       console.log('📊 Saving quiz result for:', userId);
-      const { data, error } = await supabase
+      
+      const savePromise = supabase
         .from('quiz_results')
         .insert({
           user_id: userId,
@@ -261,8 +346,14 @@ export const db = {
         })
         .select()
         .single();
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database save timed out')), 5000)
+      );
+
+      const { data, error } = await Promise.race([savePromise, timeoutPromise]) as any;
       return { data, error };
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Save quiz result error:', err);
       return { data: null, error: { message: 'Network error saving quiz result' } };
     }
@@ -275,13 +366,20 @@ export const db = {
     
     try {
       console.log('📊 Getting quiz results for:', userId);
-      const { data, error } = await supabase
+      
+      const getPromise = supabase
         .from('quiz_results')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database fetch timed out')), 5000)
+      );
+
+      const { data, error } = await Promise.race([getPromise, timeoutPromise]) as any;
       return { data, error };
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Get quiz results error:', err);
       return { data: [], error: { message: 'Network error fetching quiz results' } };
     }

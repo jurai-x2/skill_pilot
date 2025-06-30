@@ -14,6 +14,7 @@ interface AuthModalProps {
 export default function AuthModal({ isOpen, onClose, initialMode = 'signin', message }: AuthModalProps) {
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<{
     type: 'success' | 'error' | null;
     message: string;
@@ -38,6 +39,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
     setFormData({ email: '', password: '', name: '', confirmPassword: '' });
     setErrors({});
     setSubmissionStatus({ type: null, message: '' });
+    setIsSubmitting(false);
   };
 
   const validatePassword = (password: string): string[] => {
@@ -90,7 +92,10 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    if (!validateForm() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setSubmissionStatus({ type: null, message: '' });
 
     try {
       if (mode === 'signin') {
@@ -103,7 +108,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
           setTimeout(() => {
             onClose();
             resetForm();
-          }, 1500);
+          }, 1000); // Reduced delay
         } else {
           // Handle specific sign-in errors
           let errorMessage = result.error?.message || 'An error occurred during sign in.';
@@ -124,9 +129,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
         if (result.success) {
           setSubmissionStatus({
             type: 'success',
-            message: 'Account created successfully! Please check your email for a verification link before signing in.'
+            message: 'Account created successfully! You can now sign in and start your journey.'
           });
-          // Don't auto-close for signup - let user read the verification message
+          // Auto-switch to sign in after successful signup
+          setTimeout(() => {
+            setMode('signin');
+            setFormData(prev => ({ ...prev, password: '', confirmPassword: '', name: '' }));
+            setSubmissionStatus({ type: null, message: '' });
+          }, 2000);
         } else {
           // Handle specific sign-up errors
           let errorMessage = result.error?.message || 'An error occurred during sign up.';
@@ -141,21 +151,28 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
           });
         }
       } else if (mode === 'forgot') {
-        const { error } = await auth.resetPassword(formData.email);
-        if (error) {
+        try {
+          const { error } = await auth.resetPassword(formData.email);
+          if (error) {
+            setSubmissionStatus({
+              type: 'error',
+              message: error.message
+            });
+          } else {
+            setSubmissionStatus({
+              type: 'success',
+              message: 'If an account with that email exists, a password reset link has been sent to your email.'
+            });
+            setTimeout(() => {
+              setMode('signin');
+              setSubmissionStatus({ type: null, message: '' });
+            }, 3000);
+          }
+        } catch (err) {
           setSubmissionStatus({
             type: 'error',
-            message: error.message
+            message: 'Failed to send reset email. Please try again.'
           });
-        } else {
-          setSubmissionStatus({
-            type: 'success',
-            message: 'If an account with that email exists, a password reset link has been sent to your email.'
-          });
-          setTimeout(() => {
-            setMode('signin');
-            setSubmissionStatus({ type: null, message: '' });
-          }, 3000);
         }
       }
     } catch (err) {
@@ -164,6 +181,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
         type: 'error',
         message: 'An unexpected error occurred. Please try again.'
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -185,6 +204,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
   if (!isOpen) return null;
 
   const passwordStrength = mode === 'signup' ? getPasswordStrength(formData.password) : null;
+  const isLoading = loading || isSubmitting;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -204,6 +224,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            disabled={isLoading}
           >
             <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
           </button>
@@ -269,7 +290,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                  disabled={isLoading}
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed ${
                     errors.name ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                   }`}
                   placeholder="Enter your full name"
@@ -290,7 +312,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                disabled={isLoading}
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed ${
                   errors.email ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                 }`}
                 placeholder="Enter your email"
@@ -311,7 +334,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                  disabled={isLoading}
+                  className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed ${
                     errors.password ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                   }`}
                   placeholder={mode === 'signup' ? 'Create a strong password' : 'Enter your password'}
@@ -319,7 +343,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                  disabled={isLoading}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -363,7 +388,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
                   type={showPassword ? 'text' : 'password'}
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                  disabled={isLoading}
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed ${
                     errors.confirmPassword ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                   }`}
                   placeholder="Confirm your password"
@@ -376,12 +402,13 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || submissionStatus.type === 'success'}
+            disabled={isLoading || submissionStatus.type === 'success'}
             className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
           >
-            {loading && <Loader className="w-4 h-4 animate-spin" />}
+            {isLoading && <Loader className="w-4 h-4 animate-spin" />}
             <span>
               {submissionStatus.type === 'success' ? 'Success!' :
+               isLoading ? 'Processing...' :
                mode === 'signin' ? 'Sign In' : 
                mode === 'signup' ? 'Create Account' : 
                'Send Reset Link'}
@@ -389,7 +416,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
           </button>
 
           {/* Mode Switching */}
-          {submissionStatus.type !== 'success' && (
+          {submissionStatus.type !== 'success' && !isLoading && (
             <div className="text-center space-y-2">
               {mode === 'signin' && (
                 <>
@@ -438,22 +465,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'signin', mes
                   </button>
                 </p>
               )}
-            </div>
-          )}
-
-          {/* Email Verification Notice for Successful Signup */}
-          {mode === 'signup' && submissionStatus.type === 'success' && (
-            <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                After verifying your email, you can sign in and start your career quiz.
-              </p>
-              <button
-                type="button"
-                onClick={() => switchMode('signin')}
-                className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium text-sm"
-              >
-                Go to Sign In
-              </button>
             </div>
           )}
         </form>
