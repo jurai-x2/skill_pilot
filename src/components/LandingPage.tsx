@@ -87,6 +87,10 @@ export default function LandingPage({ onStartQuiz, currentLanguage }: LandingPag
     }
   ];
 
+  const handleWatchDemo = () => {
+    window.open('https://youtu.be/VdBnw-19eQ0?si=KawOy9_myCC1xO_H', '_blank');
+  };
+
   return (
     <div className="min-h-screen">
       {/* Hero Section - Refined badge size */}
@@ -149,6 +153,7 @@ export default function LandingPage({ onStartQuiz, currentLanguage }: LandingPag
                 </motion.button>
                 
                 <motion.button
+                  onClick={handleWatchDemo}
                   className="group w-full sm:w-auto text-primary-600 dark:text-primary-400 px-8 py-4 rounded-2xl font-bold text-lg border-2 border-primary-200 dark:border-primary-700 hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all duration-300 flex items-center justify-center space-x-3"
                   whileHover={{ scale: 1.05, y: -4 }}
                   whileTap={{ scale: 0.98 }}
