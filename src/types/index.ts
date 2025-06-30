@@ -132,7 +132,7 @@ export interface Achievement {
   description: string;
   icon: string;
   earned: boolean;
-  earnedAt?: Date;
+  earned_at?: string;
   xpReward: number;
   category: 'learning' | 'project' | 'streak' | 'social' | 'milestone';
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
@@ -208,8 +208,8 @@ export interface LiveEvent {
 }
 
 export interface Resume {
-  id: string;
-  userId: string;
+  id?: string;
+  userId?: string;
   personalInfo: {
     name: string;
     email: string;
@@ -219,14 +219,14 @@ export interface Resume {
     github?: string;
     portfolio?: string;
   };
-  summary: string;
-  skills: string[];
-  projects: ResumeProject[];
-  experience: WorkExperience[];
-  education: Education[];
-  certifications: Certificate[];
-  generatedAt: Date;
-  template: string;
+  summary?: string;
+  skills?: string[];
+  projects?: ResumeProject[];
+  experience?: WorkExperience[];
+  education?: Education[];
+  certifications?: Certificate[];
+  generatedAt?: Date;
+  template?: string;
   atsScore?: number;
   feedback?: string[];
 }
@@ -234,7 +234,7 @@ export interface Resume {
 export interface ResumeProject {
   name: string;
   description: string;
-  technologies: string[];
+  technologies?: string[];
   url?: string;
   github?: string;
   impact?: string;
@@ -281,9 +281,9 @@ export interface MonetizationStrategy {
   platforms: string[];
   requirements: string[];
   timeToStart: string;
-  potentialEarnings: string;
-  difficulty: 'easy' | 'medium' | 'hard';
-  examples: string[];
+  potentialEarnings?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  examples?: string[];
 }
 
 export interface SuccessStory {
