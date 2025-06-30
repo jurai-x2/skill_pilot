@@ -132,7 +132,7 @@ export default function Header({
               <div className="w-14 h-14 bg-gradient-to-br from-primary-600 via-secondary-500 to-accent-500 rounded-3xl flex items-center justify-center shadow-xl shadow-primary-500/30 group-hover:shadow-primary-500/50 transition-all duration-500 group-hover:rotate-3">
                 <Brain className="w-8 h-8 text-white" />
               </div>
-              <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-accent-400 to-secondary-500 rounded-full animate-pulse shadow-lg" />
+              {/* Removed the animated dot that was here */}
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 via-secondary-500 to-accent-500 bg-clip-text text-transparent">
