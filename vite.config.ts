@@ -7,4 +7,11 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  define: {
+  'process.env': {
+    PICA_SECRET_KEY: JSON.stringify(process.env.PICA_SECRET_KEY),
+    PICA_OPENAI_CONNECTION_KEY: JSON.stringify(process.env.PICA_OPENAI_CONNECTION_KEY)
+  }
+}
+
 });
