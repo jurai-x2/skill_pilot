@@ -49,32 +49,69 @@ export default function AIMentor({ isOpen, onClose, currentLanguage = 'en' }: AI
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() && attachments.length === 0) return;
+  if (!inputMessage.trim()) return;
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      content: inputMessage,
-      sender: 'user',
-      timestamp: new Date(),
-      attachments: attachments.length > 0 ? attachments : undefined
-    };
+  const userMessage: ChatMessage = {
+    id: Date.now().toString(),
+    content: inputMessage,
+    sender: 'user',
+    timestamp: new Date()
+  };
 
-    setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
-    setAttachments([]);
-    setIsTyping(true);
+  setMessages(prev => [...prev, userMessage]);
+  setInputMessage('');
+  setIsTyping(true);
 
-    setTimeout(() => {
-      const aiResponse: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        content: generateAIResponse(inputMessage, attachments),
+  try {
+    const response = await fetch('https://your-backend-url/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        assistantId: 'your-pica-assistant-id',
+        userId: user?.id || 'guest_user',
+        threadId: null, // or persist a threadId if needed
+        messages: [
+          {
+            role: 'user',
+            content: inputMessage
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+
+    if (data?.choices?.[0]?.message?.content) {
+      const aiMessage: ChatMessage = {
+        id: Date.now().toString() + '_ai',
+        content: data.choices[0].message.content,
         sender: 'ai',
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, aiResponse]);
-      setIsTyping(false);
-    }, 2000);
-  };
+      setMessages(prev => [...prev, aiMessage]);
+    } else {
+      setMessages(prev => [...prev, {
+        id: Date.now().toString() + '_ai',
+        content: '⚠️ AI did not return a proper message.',
+        sender: 'ai',
+        timestamp: new Date()
+      }]);
+    }
+  } catch (err) {
+    console.error("Chat error:", err);
+    setMessages(prev => [...prev, {
+      id: Date.now().toString() + '_ai',
+      content: '❌ Error reaching AI backend.',
+      sender: 'ai',
+      timestamp: new Date()
+    }]);
+  }
+
+  setIsTyping(false);
+};
+
 
   const generateAIResponse = (message: string, files: FileAttachment[]): string => {
     if (files.length > 0) {
