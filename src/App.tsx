@@ -121,6 +121,19 @@ function App() {
     };
   }, []);
 
+  // Listen for custom events to open modals
+  useEffect(() => {
+    const handleOpenLiveEvents = () => {
+      setShowLiveEvents(true);
+    };
+
+    document.addEventListener('open-live-events', handleOpenLiveEvents);
+    
+    return () => {
+      document.removeEventListener('open-live-events', handleOpenLiveEvents);
+    };
+  }, []);
+
   // Load user's latest quiz result
   useEffect(() => {
     const loadQuizResult = async () => {

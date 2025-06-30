@@ -207,6 +207,17 @@ export interface LiveEvent {
   featured: boolean;
 }
 
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  portfolioLink?: string;
+  registeredAt: Date;
+  status: 'registered' | 'attended' | 'cancelled';
+}
+
 export interface Resume {
   id?: string;
   userId?: string;

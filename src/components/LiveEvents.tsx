@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Calendar, 
   Clock, 
@@ -14,10 +14,17 @@ import {
   Filter,
   Search,
   X,
-  Loader
+  Loader,
+  CheckCircle,
+  AlertTriangle,
+  User,
+  Mail,
+  Link,
+  Github
 } from 'lucide-react';
 import { LiveEvent } from '../types';
 import { useTranslation } from '../utils/translations';
+import { useAuth } from '../hooks/useAuth';
 import { db } from '../lib/supabase';
 
 interface LiveEventsProps {
@@ -26,19 +33,56 @@ interface LiveEventsProps {
   currentLanguage?: string;
 }
 
+interface EventRegistration {
+  eventId: string;
+  fullName: string;
+  email: string;
+  portfolioLink?: string;
+}
+
 export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: LiveEventsProps) {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [registeredEvents, setRegisteredEvents] = useState<Set<string>>(new Set());
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<LiveEvent | null>(null);
+  const [registrationForm, setRegistrationForm] = useState({
+    fullName: '',
+    email: '',
+    portfolioLink: ''
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const { user } = useAuth();
   const t = useTranslation(currentLanguage);
 
   useEffect(() => {
     if (isOpen) {
       loadEvents();
+      loadRegistrations();
     }
   }, [isOpen]);
+
+  // Load user's registered events from localStorage
+  const loadRegistrations = () => {
+    if (user) {
+      const savedRegistrations = localStorage.getItem(`event_registrations_${user.id}`);
+      if (savedRegistrations) {
+        setRegisteredEvents(new Set(JSON.parse(savedRegistrations)));
+      }
+    }
+  };
+
+  // Save registrations to localStorage
+  const saveRegistrations = (registrations: Set<string>) => {
+    if (user) {
+      localStorage.setItem(`event_registrations_${user.id}`, JSON.stringify([...registrations]));
+    }
+  };
 
   const loadEvents = async () => {
     try {
@@ -173,16 +217,87 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
     return matchesFilter && matchesSearch;
   });
 
-  const toggleRegistration = (eventId: string) => {
-    setRegisteredEvents(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(eventId)) {
-        newSet.delete(eventId);
-      } else {
-        newSet.add(eventId);
+  const toggleRegistration = (event: LiveEvent) => {
+    if (!user) return;
+    
+    if (registeredEvents.has(event.id)) {
+      // Show confirmation for unregistering
+      if (confirm(`Are you sure you want to cancel your registration for "${event.title}"?`)) {
+        const newRegistrations = new Set(registeredEvents);
+        newRegistrations.delete(event.id);
+        setRegisteredEvents(newRegistrations);
+        saveRegistrations(newRegistrations);
+        
+        // Show toast
+        setToastMessage(`You've unregistered from "${event.title}"`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
       }
-      return newSet;
-    });
+    } else {
+      // Open registration modal
+      setSelectedEvent(event);
+      setRegistrationForm({
+        fullName: user.name,
+        email: user.email,
+        portfolioLink: user.portfolio_url || ''
+      });
+      setShowRegistrationModal(true);
+    }
+  };
+
+  const handleRegistrationSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate form
+    const errors: Record<string, string> = {};
+    if (!registrationForm.fullName.trim()) {
+      errors.fullName = 'Full name is required';
+    }
+    if (!registrationForm.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(registrationForm.email)) {
+      errors.email = 'Email is invalid';
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      if (selectedEvent) {
+        // Add to registered events
+        const newRegistrations = new Set(registeredEvents);
+        newRegistrations.add(selectedEvent.id);
+        setRegisteredEvents(newRegistrations);
+        saveRegistrations(newRegistrations);
+        
+        // Save registration details
+        const registrations = JSON.parse(localStorage.getItem('event_registrations_details') || '[]');
+        registrations.push({
+          eventId: selectedEvent.id,
+          eventTitle: selectedEvent.title,
+          eventDate: selectedEvent.startTime,
+          eventType: selectedEvent.type,
+          fullName: registrationForm.fullName,
+          email: registrationForm.email,
+          portfolioLink: registrationForm.portfolioLink,
+          registeredAt: new Date()
+        });
+        localStorage.setItem('event_registrations_details', JSON.stringify(registrations));
+        
+        // Close modal and show toast
+        setShowRegistrationModal(false);
+        setToastMessage(`You've successfully registered for "${selectedEvent.title}"`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }
+      
+      setIsSubmitting(false);
+    }, 1000);
   };
 
   const getEventTypeIcon = (type: string) => {
@@ -225,6 +340,10 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
   const isEventUpcoming = (event: LiveEvent) => {
     const now = new Date();
     return now < event.startTime;
+  };
+
+  const isEventFull = (event: LiveEvent) => {
+    return event.maxParticipants !== undefined && event.currentParticipants >= event.maxParticipants;
   };
 
   if (!isOpen) return null;
@@ -338,6 +457,7 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
                         const isRegistered = registeredEvents.has(event.id);
                         const isLive = isEventLive(event);
                         const isUpcoming = isEventUpcoming(event);
+                        const isFull = isEventFull(event);
 
                         return (
                           <motion.div
@@ -376,7 +496,7 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
                               </div>
                               <div className="flex items-center space-x-2">
                                 <button
-                                  onClick={() => toggleRegistration(event.id)}
+                                  onClick={() => toggleRegistration(event)}
                                   className={`p-2 rounded-lg transition-colors ${
                                     isRegistered ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
                                   }`}
@@ -384,15 +504,31 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
                                   {isRegistered ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
                                 </button>
                                 <button
+                                  onClick={() => {
+                                    if (isLive && event.meetingUrl) {
+                                      window.open(event.meetingUrl, '_blank');
+                                    } else if (!isRegistered && !isFull) {
+                                      toggleRegistration(event);
+                                    }
+                                  }}
+                                  disabled={!isLive && isRegistered || (!isLive && isFull)}
                                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                                    isLive
+                                    isLive && event.meetingUrl
                                       ? 'bg-red-500 text-white hover:bg-red-600'
                                       : isRegistered
                                       ? 'bg-secondary-500 text-white hover:bg-secondary-600'
+                                      : isFull
+                                      ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                                       : 'bg-primary-600 text-white hover:bg-primary-700'
                                   }`}
                                 >
-                                  {isLive ? t('liveEvents.joinNow') : isRegistered ? t('liveEvents.registered') : t('liveEvents.register')}
+                                  {isLive && event.meetingUrl 
+                                    ? t('liveEvents.joinNow') 
+                                    : isRegistered 
+                                    ? t('liveEvents.registered') 
+                                    : isFull 
+                                    ? 'Event Full' 
+                                    : t('liveEvents.register')}
                                 </button>
                               </div>
                             </div>
@@ -436,6 +572,7 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
                       const isRegistered = registeredEvents.has(event.id);
                       const isLive = isEventLive(event);
                       const isUpcoming = isEventUpcoming(event);
+                      const isFull = isEventFull(event);
 
                       return (
                         <motion.div
@@ -478,7 +615,7 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
                             </div>
                             <div className="flex items-center space-x-2 ml-4">
                               <button
-                                onClick={() => toggleRegistration(event.id)}
+                                onClick={() => toggleRegistration(event)}
                                 className={`p-2 rounded-lg transition-colors ${
                                   isRegistered ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
                                 }`}
@@ -486,15 +623,31 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
                                 {isRegistered ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
                               </button>
                               <button
+                                onClick={() => {
+                                  if (isLive && event.meetingUrl) {
+                                    window.open(event.meetingUrl, '_blank');
+                                  } else if (!isRegistered && !isFull) {
+                                    toggleRegistration(event);
+                                  }
+                                }}
+                                disabled={!isLive && isRegistered || (!isLive && isFull)}
                                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                                  isLive
+                                  isLive && event.meetingUrl
                                     ? 'bg-red-500 text-white hover:bg-red-600'
                                     : isRegistered
                                     ? 'bg-secondary-500 text-white hover:bg-secondary-600'
+                                    : isFull
+                                    ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                                     : 'bg-primary-600 text-white hover:bg-primary-700'
                                 }`}
                               >
-                                {isLive ? t('liveEvents.joinNow') : isRegistered ? t('liveEvents.registered') : t('liveEvents.register')}
+                                {isLive && event.meetingUrl 
+                                  ? t('liveEvents.joinNow') 
+                                  : isRegistered 
+                                  ? t('liveEvents.registered') 
+                                  : isFull 
+                                  ? 'Event Full' 
+                                  : t('liveEvents.register')}
                               </button>
                             </div>
                           </div>
@@ -517,6 +670,141 @@ export default function LiveEvents({ isOpen, onClose, currentLanguage = 'en' }: 
             )}
           </div>
         </div>
+
+        {/* Registration Modal */}
+        <AnimatePresence>
+          {showRegistrationModal && selectedEvent && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+              <motion.div
+                className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Register for Event</h3>
+                  <button
+                    onClick={() => setShowRegistrationModal(false)}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                  >
+                    <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  </button>
+                </div>
+                
+                <div className="mb-6">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getEventTypeColor(selectedEvent.type)}`}>
+                      {React.createElement(getEventTypeIcon(selectedEvent.type), { className: "w-5 h-5" })}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 dark:text-white">{selectedEvent.title}</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{formatEventTime(selectedEvent.startTime)}</p>
+                    </div>
+                  </div>
+                  
+                  <form onSubmit={handleRegistrationSubmit}>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Full Name
+                        </label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
+                          <input
+                            type="text"
+                            value={registrationForm.fullName}
+                            onChange={(e) => setRegistrationForm({...registrationForm, fullName: e.target.value})}
+                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                              formErrors.fullName ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                            }`}
+                            placeholder="Enter your full name"
+                          />
+                        </div>
+                        {formErrors.fullName && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.fullName}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Email Address
+                        </label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
+                          <input
+                            type="email"
+                            value={registrationForm.email}
+                            onChange={(e) => setRegistrationForm({...registrationForm, email: e.target.value})}
+                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                              formErrors.email ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                            }`}
+                            placeholder="Enter your email address"
+                          />
+                        </div>
+                        {formErrors.email && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.email}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          GitHub/Portfolio Link (Optional)
+                        </label>
+                        <div className="relative">
+                          <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
+                          <input
+                            type="url"
+                            value={registrationForm.portfolioLink}
+                            onChange={(e) => setRegistrationForm({...registrationForm, portfolioLink: e.target.value})}
+                            className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            placeholder="https://github.com/yourusername"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4">
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="w-full flex items-center justify-center space-x-2 bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader className="w-5 h-5 animate-spin" />
+                              <span>Registering...</span>
+                            </>
+                          ) : (
+                            <span>Submit Registration</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Toast Notification */}
+        <AnimatePresence>
+          {showToast && (
+            <motion.div
+              className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4 max-w-md z-[70]"
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+            >
+              <div className="flex items-start space-x-3">
+                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">Success</p>
+                  <p className="text-gray-600 dark:text-gray-300">{toastMessage}</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

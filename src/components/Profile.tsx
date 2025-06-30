@@ -17,9 +17,12 @@ import {
   Target,
   Zap,
   RefreshCw,
-  Loader
+  Loader,
+  Clock,
+  Users,
+  ExternalLink
 } from 'lucide-react';
-import { User } from '../types';
+import { User, LiveEvent } from '../types';
 import { useTranslation } from '../utils/translations';
 import { useAuth } from '../hooks/useAuth';
 import { db } from '../lib/supabase';
@@ -28,6 +31,14 @@ interface ProfileProps {
   isOpen: boolean;
   onClose: () => void;
   currentLanguage?: string;
+}
+
+interface RegisteredEvent {
+  eventId: string;
+  eventTitle: string;
+  eventDate: string;
+  eventType: string;
+  registeredAt: string;
 }
 
 export default function Profile({ isOpen, onClose, currentLanguage = 'en' }: ProfileProps) {
@@ -39,6 +50,8 @@ export default function Profile({ isOpen, onClose, currentLanguage = 'en' }: Pro
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<User>>({});
+  const [activeTab, setActiveTab] = useState<'profile' | 'events'>('profile');
+  const [registeredEvents, setRegisteredEvents] = useState<RegisteredEvent[]>([]);
   
   const { user, updateProfile } = useAuth();
   const t = useTranslation(currentLanguage);
@@ -53,8 +66,22 @@ export default function Profile({ isOpen, onClose, currentLanguage = 'en' }: Pro
         portfolio_url: user.portfolio_url || '',
         careerPath: user.careerPath || ''
       });
+      
+      // Load registered events
+      loadRegisteredEvents();
     }
   }, [user]);
+
+  const loadRegisteredEvents = () => {
+    try {
+      const savedRegistrations = localStorage.getItem('event_registrations_details');
+      if (savedRegistrations) {
+        setRegisteredEvents(JSON.parse(savedRegistrations));
+      }
+    } catch (err) {
+      console.error('Error loading registered events:', err);
+    }
+  };
 
   const careerPaths = [
     'Frontend Developer',
@@ -149,6 +176,38 @@ export default function Profile({ isOpen, onClose, currentLanguage = 'en' }: Pro
     }
   };
 
+  const getEventTypeIcon = (type: string) => {
+    switch (type) {
+      case 'workshop': return Video;
+      case 'hackathon': return Trophy;
+      case 'ama': return MessageSquare;
+      case 'career-talk': return Users;
+      case 'project-showcase': return Award;
+      default: return Calendar;
+    }
+  };
+
+  const getEventTypeColor = (type: string) => {
+    switch (type) {
+      case 'workshop': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300';
+      case 'hackathon': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300';
+      case 'ama': return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300';
+      case 'career-talk': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300';
+      case 'project-showcase': return 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300';
+      default: return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  };
+
   if (!isOpen || !user) return null;
 
   return (
@@ -177,6 +236,32 @@ export default function Profile({ isOpen, onClose, currentLanguage = 'en' }: Pro
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`flex items-center space-x-2 px-6 py-4 font-medium transition-colors ${
+              activeTab === 'profile'
+                ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+            }`}
+          >
+            <UserIcon className="w-4 h-4" />
+            <span>Profile</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('events')}
+            className={`flex items-center space-x-2 px-6 py-4 font-medium transition-colors ${
+              activeTab === 'events'
+                ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Registered Events</span>
+          </button>
+        </div>
+
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {/* Status Messages */}
@@ -198,322 +283,404 @@ export default function Profile({ isOpen, onClose, currentLanguage = 'en' }: Pro
             </div>
           )}
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Left Column - Profile Info */}
-            <div className="md:col-span-2 space-y-8">
-              {/* Profile Card */}
-              <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 overflow-hidden">
-                <div className="bg-gradient-to-r from-primary-600 to-secondary-600 h-32 relative">
-                  {!isEditing ? (
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
-                    >
-                      <Edit className="w-5 h-5" />
-                    </button>
-                  ) : (
-                    <div className="absolute top-4 right-4 flex space-x-2">
+          {activeTab === 'profile' && (
+            <div className="grid md:grid-cols-3 gap-8">
+              {/* Left Column - Profile Info */}
+              <div className="md:col-span-2 space-y-8">
+                {/* Profile Card */}
+                <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 overflow-hidden">
+                  <div className="bg-gradient-to-r from-primary-600 to-secondary-600 h-32 relative">
+                    {!isEditing ? (
                       <button
-                        onClick={() => setIsEditing(false)}
-                        className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
+                        onClick={() => setIsEditing(true)}
+                        className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
                       >
-                        <X className="w-5 h-5" />
+                        <Edit className="w-5 h-5" />
                       </button>
-                      <button
-                        onClick={handleSaveProfile}
-                        disabled={isSaving}
-                        className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors disabled:opacity-50"
-                      >
-                        {isSaving ? <Loader className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                      </button>
+                    ) : (
+                      <div className="absolute top-4 right-4 flex space-x-2">
+                        <button
+                          onClick={() => setIsEditing(false)}
+                          className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={handleSaveProfile}
+                          disabled={isSaving}
+                          className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors disabled:opacity-50"
+                        >
+                          {isSaving ? <Loader className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        </button>
+                      </div>
+                    )}
+                    
+                    <div className="absolute -bottom-12 left-6">
+                      <div className="w-24 h-24 rounded-full border-4 border-white dark:border-gray-700 overflow-hidden bg-gray-200 dark:bg-gray-600">
+                        {formData.avatar_url ? (
+                          <img 
+                            src={formData.avatar_url} 
+                            alt={formData.name} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-primary-100 dark:bg-primary-900/30">
+                            <span className="text-3xl font-bold text-primary-600 dark:text-primary-400">
+                              {formData.name?.charAt(0).toUpperCase() || user.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  </div>
                   
-                  <div className="absolute -bottom-12 left-6">
-                    <div className="w-24 h-24 rounded-full border-4 border-white dark:border-gray-700 overflow-hidden bg-gray-200 dark:bg-gray-600">
-                      {formData.avatar_url ? (
-                        <img 
-                          src={formData.avatar_url} 
-                          alt={formData.name} 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-primary-100 dark:bg-primary-900/30">
-                          <span className="text-3xl font-bold text-primary-600 dark:text-primary-400">
-                            {formData.name?.charAt(0).toUpperCase() || user.name.charAt(0).toUpperCase()}
-                          </span>
+                  <div className="pt-16 px-6 pb-6">
+                    {isEditing ? (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Full Name
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.name || ''}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                          />
                         </div>
-                      )}
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Country
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.country || ''}
+                            onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Profile Photo URL
+                          </label>
+                          <input
+                            type="url"
+                            value={formData.avatar_url || ''}
+                            onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
+                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                            placeholder="https://example.com/photo.jpg"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            GitHub URL
+                          </label>
+                          <input
+                            type="url"
+                            value={formData.github_url || ''}
+                            onChange={(e) => setFormData({ ...formData, github_url: e.target.value })}
+                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                            placeholder="https://github.com/username"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Portfolio URL
+                          </label>
+                          <input
+                            type="url"
+                            value={formData.portfolio_url || ''}
+                            onChange={(e) => setFormData({ ...formData, portfolio_url: e.target.value })}
+                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                            placeholder="https://myportfolio.com"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                          {user.name}
+                        </h3>
+                        
+                        <div className="space-y-3 text-gray-600 dark:text-gray-300">
+                          <div className="flex items-center space-x-2">
+                            <Mail className="w-4 h-4" />
+                            <span>{user.email}</span>
+                          </div>
+                          
+                          {user.country && (
+                            <div className="flex items-center space-x-2">
+                              <MapPin className="w-4 h-4" />
+                              <span>{user.country}</span>
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="w-4 h-4" />
+                            <span>Joined {new Date(user.joined_at).toLocaleDateString()}</span>
+                          </div>
+                          
+                          {user.github_url && (
+                            <div className="flex items-center space-x-2">
+                              <Github className="w-4 h-4" />
+                              <a 
+                                href={user.github_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-primary-600 dark:text-primary-400 hover:underline"
+                              >
+                                GitHub Profile
+                              </a>
+                            </div>
+                          )}
+                          
+                          {user.portfolio_url && (
+                            <div className="flex items-center space-x-2">
+                              <Globe className="w-4 h-4" />
+                              <a 
+                                href={user.portfolio_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-primary-600 dark:text-primary-400 hover:underline"
+                              >
+                                Portfolio Website
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Career Path Section */}
+                <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Career Path</h3>
+                    <button
+                      onClick={() => setShowTrackChangeConfirm(true)}
+                      className="flex items-center space-x-2 px-3 py-1 text-sm bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Change Path</span>
+                    </button>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-lg p-6 border border-primary-100 dark:border-primary-800/30">
+                    <div className="flex items-center space-x-4 mb-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center">
+                        <Target className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="text-xl font-bold text-gray-900 dark:text-white">
+                          {user.careerPath || 'No Career Path Selected'}
+                        </h4>
+                        <p className="text-gray-600 dark:text-gray-300">
+                          {user.careerPath 
+                            ? 'Your personalized learning journey' 
+                            : 'Take the career quiz to discover your path'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {user.careerPath && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Current Level</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">{user.level}</span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-primary-500 to-secondary-500"
+                            style={{ width: `${(user.xp / (user.level * 100)) * 100}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>{user.xp} XP</span>
+                          <span>{user.level * 100} XP needed for level {user.level + 1}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Right Column - Stats & Achievements */}
+              <div className="space-y-8">
+                {/* Stats Card */}
+                <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Your Progress</h3>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                        <Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Total XP</div>
+                        <div className="text-xl font-bold text-gray-900 dark:text-white">{user.total_xp.toLocaleString()}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                        <BookOpen className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Lessons Completed</div>
+                        <div className="text-xl font-bold text-gray-900 dark:text-white">{user.completed_lessons}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                        <Award className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Certificates Earned</div>
+                        <div className="text-xl font-bold text-gray-900 dark:text-white">{user.certificates.length}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+                        <Calendar className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Learning Streak</div>
+                        <div className="text-xl font-bold text-gray-900 dark:text-white">{user.streak} days</div>
+                      </div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="pt-16 px-6 pb-6">
-                  {isEditing ? (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Full Name
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.name || ''}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Country
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.country || ''}
-                          onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Profile Photo URL
-                        </label>
-                        <input
-                          type="url"
-                          value={formData.avatar_url || ''}
-                          onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
-                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                          placeholder="https://example.com/photo.jpg"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          GitHub URL
-                        </label>
-                        <input
-                          type="url"
-                          value={formData.github_url || ''}
-                          onChange={(e) => setFormData({ ...formData, github_url: e.target.value })}
-                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                          placeholder="https://github.com/username"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Portfolio URL
-                        </label>
-                        <input
-                          type="url"
-                          value={formData.portfolio_url || ''}
-                          onChange={(e) => setFormData({ ...formData, portfolio_url: e.target.value })}
-                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                          placeholder="https://myportfolio.com"
-                        />
-                      </div>
-                    </div>
-                  ) : (
+                {/* Account Settings */}
+                <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Account Settings</h3>
+                  
+                  <div className="space-y-4">
                     <div>
-                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                        {user.name}
-                      </h3>
-                      
-                      <div className="space-y-3 text-gray-600 dark:text-gray-300">
-                        <div className="flex items-center space-x-2">
-                          <Mail className="w-4 h-4" />
-                          <span>{user.email}</span>
-                        </div>
-                        
-                        {user.country && (
-                          <div className="flex items-center space-x-2">
-                            <MapPin className="w-4 h-4" />
-                            <span>{user.country}</span>
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="w-4 h-4" />
-                          <span>Joined {new Date(user.joined_at).toLocaleDateString()}</span>
-                        </div>
-                        
-                        {user.github_url && (
-                          <div className="flex items-center space-x-2">
-                            <Github className="w-4 h-4" />
-                            <a 
-                              href={user.github_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-primary-600 dark:text-primary-400 hover:underline"
-                            >
-                              GitHub Profile
-                            </a>
-                          </div>
-                        )}
-                        
-                        {user.portfolio_url && (
-                          <div className="flex items-center space-x-2">
-                            <Globe className="w-4 h-4" />
-                            <a 
-                              href={user.portfolio_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-primary-600 dark:text-primary-400 hover:underline"
-                            >
-                              Portfolio Website
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Career Path Section */}
-              <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Career Path</h3>
-                  <button
-                    onClick={() => setShowTrackChangeConfirm(true)}
-                    className="flex items-center space-x-2 px-3 py-1 text-sm bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    <span>Change Path</span>
-                  </button>
-                </div>
-                
-                <div className="bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-lg p-6 border border-primary-100 dark:border-primary-800/30">
-                  <div className="flex items-center space-x-4 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center">
-                      <Target className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h4 className="text-xl font-bold text-gray-900 dark:text-white">
-                        {user.careerPath || 'No Career Path Selected'}
-                      </h4>
-                      <p className="text-gray-600 dark:text-gray-300">
-                        {user.careerPath 
-                          ? 'Your personalized learning journey' 
-                          : 'Take the career quiz to discover your path'}
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Language
+                      </label>
+                      <select
+                        value={user.language}
+                        disabled
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white cursor-not-allowed"
+                      >
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                      </select>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Change language from the main menu
                       </p>
                     </div>
-                  </div>
-                  
-                  {user.careerPath && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Current Level</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{user.level}</span>
-                      </div>
-                      <div className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-primary-500 to-secondary-500"
-                          style={{ width: `${(user.xp / (user.level * 100)) * 100}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                        <span>{user.xp} XP</span>
-                        <span>{user.level * 100} XP needed for level {user.level + 1}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            {/* Right Column - Stats & Achievements */}
-            <div className="space-y-8">
-              {/* Stats Card */}
-              <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Your Progress</h3>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                      <Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
+                    
                     <div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Total XP</div>
-                      <div className="text-xl font-bold text-gray-900 dark:text-white">{user.total_xp.toLocaleString()}</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                      <BookOpen className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Lessons Completed</div>
-                      <div className="text-xl font-bold text-gray-900 dark:text-white">{user.completed_lessons}</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                      <Award className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Certificates Earned</div>
-                      <div className="text-xl font-bold text-gray-900 dark:text-white">{user.certificates.length}</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
-                      <Calendar className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Learning Streak</div>
-                      <div className="text-xl font-bold text-gray-900 dark:text-white">{user.streak} days</div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Weekly Learning Goal
+                      </label>
+                      <select
+                        value={user.weekly_goal}
+                        disabled
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white cursor-not-allowed"
+                      >
+                        <option value="5">5 hours/week</option>
+                        <option value="10">10 hours/week</option>
+                        <option value="15">15 hours/week</option>
+                        <option value="20">20 hours/week</option>
+                      </select>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'events' && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Registered Events</h3>
               
-              {/* Account Settings */}
-              <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Account Settings</h3>
-                
+              {registeredEvents.length > 0 ? (
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Language
-                    </label>
-                    <select
-                      value={user.language}
-                      disabled
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white cursor-not-allowed"
-                    >
-                      <option value="en">English</option>
-                      <option value="es">Spanish</option>
-                      <option value="fr">French</option>
-                    </select>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Change language from the main menu
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Weekly Learning Goal
-                    </label>
-                    <select
-                      value={user.weekly_goal}
-                      disabled
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white cursor-not-allowed"
-                    >
-                      <option value="5">5 hours/week</option>
-                      <option value="10">10 hours/week</option>
-                      <option value="15">15 hours/week</option>
-                      <option value="20">20 hours/week</option>
-                    </select>
-                  </div>
+                  {registeredEvents.map((event, index) => {
+                    const EventIcon = getEventTypeIcon(event.eventType);
+                    
+                    return (
+                      <motion.div
+                        key={event.eventId}
+                        className="bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-4 hover:shadow-md transition-shadow"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <div className="flex items-start space-x-4">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getEventTypeColor(event.eventType)}`}>
+                            <EventIcon className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <h4 className="font-semibold text-gray-900 dark:text-white">{event.eventTitle}</h4>
+                              <span className={`px-2 py-1 text-xs rounded-full ${getEventTypeColor(event.eventType)}`}>
+                                {event.eventType.replace('-', ' ')}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                              <div className="flex items-center space-x-1">
+                                <Clock className="w-4 h-4" />
+                                <span>{formatDate(event.eventDate)}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Calendar className="w-4 h-4" />
+                                <span>Registered: {new Date(event.registeredAt).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-500 dark:text-gray-400">Status: <span className="text-green-600 dark:text-green-400 font-medium">Registered</span></span>
+                              <button
+                                className="flex items-center space-x-1 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm"
+                                onClick={() => {
+                                  // In a real app, this would open the event details or join link
+                                  alert(`Join link for ${event.eventTitle} would open here`);
+                                }}
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                                <span>View Details</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
-              </div>
+              ) : (
+                <div className="text-center py-12 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <Calendar className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No registered events</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    You haven't registered for any events yet.
+                  </p>
+                  <button
+                    onClick={() => {
+                      // This would navigate to the events page in a real app
+                      onClose();
+                      // Open the live events modal
+                      document.dispatchEvent(new CustomEvent('open-live-events'));
+                    }}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                  >
+                    Browse Events
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
       </motion.div>
       
