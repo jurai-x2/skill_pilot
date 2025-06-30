@@ -50,7 +50,10 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
   return (
     <div className="relative">
       <motion.button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         className="flex items-center space-x-2 sm:space-x-3 px-3 sm:px-4 py-2.5 sm:py-3.5 bg-gradient-to-br from-white to-gray-50 dark:from-gray-700 dark:to-gray-800 hover:from-primary-50 hover:to-secondary-50 dark:hover:from-primary-900/30 dark:hover:to-secondary-900/30 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl group min-w-[120px] sm:min-w-[140px] border border-gray-200/50 dark:border-gray-600/50"
         whileHover={{ scale: 1.05, y: -2 }}
         whileTap={{ scale: 0.95 }}
@@ -66,19 +69,19 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Enhanced Backdrop for All Devices - FIXED: Higher z-index */}
+            {/* Ultra-high priority backdrop */}
             <div
-              className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-sm"
+              className="fixed inset-0 z-[10998] bg-black/40 backdrop-blur-sm"
               onClick={() => setIsOpen(false)}
             />
             
-            {/* High Contrast Dropdown - FIXED: Much higher z-index for desktop visibility */}
+            {/* Maximum z-index dropdown with ultra-high contrast */}
             <motion.div
-              className="absolute top-full mt-2 sm:mt-3 z-[9999] bg-white dark:bg-gray-800 backdrop-blur-2xl border-2 border-gray-300 dark:border-gray-600 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden
+              className="absolute top-full mt-2 sm:mt-3 z-[10999] bg-white dark:bg-gray-800 backdrop-blur-2xl border-2 border-gray-300 dark:border-gray-600 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden
                          /* Mobile: Full width with high contrast */
                          left-0 right-0 max-h-[70vh]
                          /* Small screens (640px+): Positioned dropdown */
-                         sm:left-auto sm:right-0 sm:w-80 sm:max-h-96
+                         sm:left-auto sm:right-0 sm:w-80
                          /* Medium screens (768px+): Larger dropdown */
                          md:w-96 md:max-h-[28rem]
                          /* Large screens (1024px+): Even larger */
@@ -89,12 +92,13 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.2 }}
+              onClick={(e) => e.stopPropagation()}
             >
               {/* High contrast gradient background */}
               <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-secondary-500/10 rounded-2xl sm:rounded-3xl" />
               
               <div className="relative">
-                {/* Header - FIXED: High contrast and readable in dark theme */}
+                {/* Header - ULTRA HIGH contrast and readable in dark theme */}
                 <div className="px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
                   <div className="flex items-center space-x-3">
                     <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 dark:text-primary-400 flex-shrink-0" />
@@ -171,7 +175,7 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
                   </div>
                 </div>
                 
-                {/* Footer - FIXED: High contrast in dark theme */}
+                {/* Footer - ULTRA HIGH contrast in dark theme */}
                 <div className="border-t-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700
                                /* Responsive padding */
                                p-3 sm:p-4 md:p-5 lg:p-6">

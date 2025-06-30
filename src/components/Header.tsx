@@ -86,6 +86,21 @@ export default function Header({
     onViewChange('home');
   };
 
+  // Close all dropdowns when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = () => {
+      setShowToolsMenu(false);
+      setShowLearningMenu(false);
+      setShowUserMenu(false);
+      setShowSettingsMenu(false);
+    };
+
+    if (showToolsMenu || showLearningMenu || showUserMenu || showSettingsMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showToolsMenu, showLearningMenu, showUserMenu, showSettingsMenu]);
+
   return (
     <motion.header 
       className="fixed top-0 left-0 right-0 z-50"
@@ -161,7 +176,13 @@ export default function Header({
             {/* Enhanced Learning Dropdown */}
             <div className="relative">
               <motion.button
-                onClick={() => setShowLearningMenu(!showLearningMenu)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLearningMenu(!showLearningMenu);
+                  setShowToolsMenu(false);
+                  setShowUserMenu(false);
+                  setShowSettingsMenu(false);
+                }}
                 className="flex items-center space-x-3 px-6 py-3.5 rounded-2xl font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-300"
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -173,45 +194,51 @@ export default function Header({
               
               <AnimatePresence>
                 {showLearningMenu && (
-                  <motion.div
-                    className="absolute top-full right-0 mt-3 w-80 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-3 overflow-hidden z-[100]"
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-secondary-500/5 rounded-3xl" />
-                    <div className="relative space-y-2">
-                      <div className="px-4 py-2">
-                        <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                          Learning Tools
-                        </h3>
+                  <>
+                    {/* Backdrop */}
+                    <div className="fixed inset-0 z-[9998]" onClick={() => setShowLearningMenu(false)} />
+                    
+                    <motion.div
+                      className="absolute top-full right-0 mt-3 w-80 bg-white dark:bg-gray-800 backdrop-blur-2xl rounded-3xl shadow-2xl border-2 border-gray-200 dark:border-gray-600 p-3 overflow-hidden z-[9999]"
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-secondary-500/5 rounded-3xl" />
+                      <div className="relative space-y-2">
+                        <div className="px-4 py-2">
+                          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                            Learning Tools
+                          </h3>
+                        </div>
+                        {learningTools.map((tool, index) => (
+                          <motion.button
+                            key={tool.name}
+                            onClick={() => {
+                              tool.action();
+                              setShowLearningMenu(false);
+                            }}
+                            className="relative w-full flex items-center space-x-4 p-4 text-left rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300 group"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            whileHover={{ x: 6 }}
+                          >
+                            <div className={`w-12 h-12 bg-gradient-to-br ${tool.color} rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110`}>
+                              <tool.icon className="w-6 h-6 text-white" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-gray-900 dark:text-white text-base">{tool.name}</div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">{tool.description}</div>
+                            </div>
+                            <ChevronDown className="w-5 h-5 text-gray-400 rotate-[-90deg] group-hover:text-primary-500 transition-colors" />
+                          </motion.button>
+                        ))}
                       </div>
-                      {learningTools.map((tool, index) => (
-                        <motion.button
-                          key={tool.name}
-                          onClick={() => {
-                            tool.action();
-                            setShowLearningMenu(false);
-                          }}
-                          className="relative w-full flex items-center space-x-4 p-4 text-left rounded-2xl hover:bg-white/70 dark:hover:bg-gray-700/70 transition-all duration-300 group"
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          whileHover={{ x: 6 }}
-                        >
-                          <div className={`w-12 h-12 bg-gradient-to-br ${tool.color} rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110`}>
-                            <tool.icon className="w-6 h-6 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-semibold text-gray-900 dark:text-white text-base">{tool.name}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{tool.description}</div>
-                          </div>
-                          <ChevronDown className="w-5 h-5 text-gray-400 rotate-[-90deg] group-hover:text-primary-500 transition-colors" />
-                        </motion.button>
-                      ))}
-                    </div>
-                  </motion.div>
+                    </motion.div>
+                  </>
                 )}
               </AnimatePresence>
             </div>
@@ -219,7 +246,13 @@ export default function Header({
             {/* Enhanced Tools Dropdown */}
             <div className="relative">
               <motion.button
-                onClick={() => setShowToolsMenu(!showToolsMenu)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowToolsMenu(!showToolsMenu);
+                  setShowLearningMenu(false);
+                  setShowUserMenu(false);
+                  setShowSettingsMenu(false);
+                }}
                 className="flex items-center space-x-3 px-6 py-3.5 rounded-2xl font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-300"
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -231,46 +264,52 @@ export default function Header({
               
               <AnimatePresence>
                 {showToolsMenu && (
-                  <motion.div
-                    className="absolute top-full right-0 mt-3 w-96 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-3 overflow-hidden z-[100]"
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-secondary-500/5 to-accent-500/5 rounded-3xl" />
-                    <div className="relative">
-                      <div className="px-4 py-2 mb-2">
-                        <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                          Professional Tools
-                        </h3>
+                  <>
+                    {/* Backdrop */}
+                    <div className="fixed inset-0 z-[9998]" onClick={() => setShowToolsMenu(false)} />
+                    
+                    <motion.div
+                      className="absolute top-full right-0 mt-3 w-96 bg-white dark:bg-gray-800 backdrop-blur-2xl rounded-3xl shadow-2xl border-2 border-gray-200 dark:border-gray-600 p-3 overflow-hidden z-[9999]"
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-secondary-500/5 to-accent-500/5 rounded-3xl" />
+                      <div className="relative">
+                        <div className="px-4 py-2 mb-2">
+                          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                            Professional Tools
+                          </h3>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {tools.map((tool, index) => (
+                            <motion.button
+                              key={tool.name}
+                              onClick={() => {
+                                tool.action();
+                                setShowToolsMenu(false);
+                              }}
+                              className="relative flex flex-col items-center space-y-3 p-5 text-center rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300 group"
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: index * 0.05 }}
+                              whileHover={{ y: -3 }}
+                            >
+                              <div className={`w-14 h-14 bg-gradient-to-br ${tool.color} rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110`}>
+                                <tool.icon className="w-7 h-7 text-white" />
+                              </div>
+                              <div>
+                                <div className="font-semibold text-gray-900 dark:text-white text-sm">{tool.name}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{tool.description}</div>
+                              </div>
+                            </motion.button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {tools.map((tool, index) => (
-                          <motion.button
-                            key={tool.name}
-                            onClick={() => {
-                              tool.action();
-                              setShowToolsMenu(false);
-                            }}
-                            className="relative flex flex-col items-center space-y-3 p-5 text-center rounded-2xl hover:bg-white/70 dark:hover:bg-gray-700/70 transition-all duration-300 group"
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: index * 0.05 }}
-                            whileHover={{ y: -3 }}
-                          >
-                            <div className={`w-14 h-14 bg-gradient-to-br ${tool.color} rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110`}>
-                              <tool.icon className="w-7 h-7 text-white" />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-gray-900 dark:text-white text-sm">{tool.name}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{tool.description}</div>
-                            </div>
-                          </motion.button>
-                        ))}
-                      </div>
-                    </div>
-                  </motion.div>
+                    </motion.div>
+                  </>
                 )}
               </AnimatePresence>
             </div>
@@ -278,10 +317,16 @@ export default function Header({
 
           {/* Enhanced Right side controls */}
           <div className="hidden xl:flex items-center space-x-4">
-            {/* Settings Dropdown - FIXED: Higher z-index */}
+            {/* Settings Dropdown - COMPLETELY REDESIGNED for maximum visibility */}
             <div className="relative">
               <motion.button
-                onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowSettingsMenu(!showSettingsMenu);
+                  setShowToolsMenu(false);
+                  setShowLearningMenu(false);
+                  setShowUserMenu(false);
+                }}
                 className="p-4 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-700 transition-all duration-300 shadow-lg hover:shadow-xl group"
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
@@ -291,42 +336,58 @@ export default function Header({
 
               <AnimatePresence>
                 {showSettingsMenu && (
-                  <motion.div
-                    className="absolute top-full right-0 mt-3 w-80 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-4 overflow-hidden z-[100]"
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  <>
+                    {/* High-priority backdrop */}
+                    <div 
+                      className="fixed inset-0 z-[9998] bg-black/20 backdrop-blur-sm" 
+                      onClick={() => setShowSettingsMenu(false)} 
+                    />
+                    
+                    {/* Ultra-high z-index dropdown with maximum contrast */}
+                    <motion.div
+                      className="absolute top-full right-0 mt-3 w-80 bg-white dark:bg-gray-800 backdrop-blur-2xl rounded-2xl shadow-2xl border-2 border-gray-300 dark:border-gray-600 p-6 overflow-hidden z-[9999]"
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-gray-200 dark:border-gray-600">
+                        <Settings className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Settings</h3>
                       </div>
                       
-                      <div className="space-y-4">
+                      {/* Settings Content */}
+                      <div className="space-y-6">
+                        {/* Language Setting */}
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                             Language
                           </label>
-                          <LanguageSelector 
-                            currentLanguage={currentLanguage}
-                            onLanguageChange={(language) => {
-                              const event = new CustomEvent('languageChange', { detail: language });
-                              window.dispatchEvent(event);
-                            }}
-                          />
+                          <div className="relative z-[10000]">
+                            <LanguageSelector 
+                              currentLanguage={currentLanguage}
+                              onLanguageChange={(language) => {
+                                const event = new CustomEvent('languageChange', { detail: language });
+                                window.dispatchEvent(event);
+                              }}
+                            />
+                          </div>
                         </div>
                         
+                        {/* Theme Setting */}
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                             Theme
                           </label>
-                          <ThemeSwitcher currentTheme={currentTheme} onThemeChange={onThemeChange} />
+                          <div className="relative z-[10000]">
+                            <ThemeSwitcher currentTheme={currentTheme} onThemeChange={onThemeChange} />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
+                    </motion.div>
+                  </>
                 )}
               </AnimatePresence>
             </div>
@@ -334,7 +395,13 @@ export default function Header({
             {user ? (
               <div className="relative">
                 <motion.button 
-                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowUserMenu(!showUserMenu);
+                    setShowToolsMenu(false);
+                    setShowLearningMenu(false);
+                    setShowSettingsMenu(false);
+                  }}
                   className="relative p-4 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 hover:from-primary-100 hover:to-secondary-100 dark:hover:from-primary-900/30 dark:hover:to-secondary-900/30 transition-all duration-300 shadow-lg hover:shadow-xl group"
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
@@ -345,37 +412,43 @@ export default function Header({
 
                 <AnimatePresence>
                   {showUserMenu && (
-                    <motion.div
-                      className="absolute top-full right-0 mt-3 w-64 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-3 overflow-hidden z-[100]"
-                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <div className="p-4 border-b border-gray-200 dark:border-gray-600">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
-                            <span className="font-semibold text-primary-600 dark:text-primary-400">
-                              {user.name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="font-semibold text-gray-900 dark:text-white">{user.name}</div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">{user.email}</div>
+                    <>
+                      {/* Backdrop */}
+                      <div className="fixed inset-0 z-[9998]" onClick={() => setShowUserMenu(false)} />
+                      
+                      <motion.div
+                        className="absolute top-full right-0 mt-3 w-64 bg-white dark:bg-gray-800 backdrop-blur-2xl rounded-2xl shadow-2xl border-2 border-gray-200 dark:border-gray-600 p-3 overflow-hidden z-[9999]"
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="p-4 border-b border-gray-200 dark:border-gray-600">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
+                              <span className="font-semibold text-primary-600 dark:text-primary-400">
+                                {user.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900 dark:text-white">{user.name}</div>
+                              <div className="text-sm text-gray-600 dark:text-gray-400">{user.email}</div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      
-                      <div className="p-2">
-                        <button
-                          onClick={handleSignOut}
-                          className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          <span>Sign Out</span>
-                        </button>
-                      </div>
-                    </motion.div>
+                        
+                        <div className="p-2">
+                          <button
+                            onClick={handleSignOut}
+                            className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            <span>Sign Out</span>
+                          </button>
+                        </div>
+                      </motion.div>
+                    </>
                   )}
                 </AnimatePresence>
               </div>

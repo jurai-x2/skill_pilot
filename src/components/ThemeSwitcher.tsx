@@ -44,7 +44,10 @@ export default function ThemeSwitcher({ currentTheme, onThemeChange }: ThemeSwit
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         className="flex items-center space-x-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
         aria-label="Theme selector"
       >
@@ -58,18 +61,19 @@ export default function ThemeSwitcher({ currentTheme, onThemeChange }: ThemeSwit
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Backdrop - FIXED: Higher z-index */}
+            {/* Ultra-high priority backdrop */}
             <div
-              className="fixed inset-0 z-[9998]"
+              className="fixed inset-0 z-[10998]"
               onClick={() => setIsOpen(false)}
             />
             
-            {/* Dropdown - FIXED: Much higher z-index for desktop visibility */}
+            {/* Maximum z-index dropdown for desktop visibility */}
             <motion.div
-              className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-[9999]"
+              className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-[10999]"
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="p-2">
                 <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide px-3 py-2">
