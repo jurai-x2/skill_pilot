@@ -19,21 +19,47 @@ export const useAuth = (): AuthState => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-      } else {
-        setLoading(false);
+    const getInitialSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          setLoading(false);
+          return;
+        }
+
+        setSession(session);
+        
+        if (session?.user) {
+          await fetchUserProfile(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error in getInitialSession:', error);
+        if (mounted) {
+          setLoading(false);
+        }
       }
-    });
+    };
+
+    getInitialSession();
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      
+      console.log('Auth state changed:', event, session?.user?.id);
       setSession(session);
+      
       if (session?.user) {
         await fetchUserProfile(session.user.id);
       } else {
@@ -42,11 +68,16 @@ export const useAuth = (): AuthState => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log('Fetching user profile for:', userId);
+      
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -55,11 +86,36 @@ export const useAuth = (): AuthState => {
 
       if (error) {
         console.error('Error fetching user profile:', error);
+        
+        // If user doesn't exist, create a basic profile
+        if (error.code === 'PGRST116') {
+          console.log('User profile not found, will be created by trigger');
+          // Set a basic user object while waiting for the trigger to create the profile
+          const session = await supabase.auth.getSession();
+          if (session.data.session?.user) {
+            const basicUser: User = {
+              id: userId,
+              name: session.data.session.user.email?.split('@')[0] || 'User',
+              email: session.data.session.user.email || '',
+              level: 1,
+              xp: 0,
+              totalXp: 0,
+              streak: 0,
+              completedLessons: 0,
+              certificates: [],
+              joinedAt: new Date(),
+              language: 'en'
+            };
+            setUser(basicUser);
+          }
+        }
         setLoading(false);
         return;
       }
 
       if (data) {
+        console.log('User profile found:', data);
+        
         // Fetch certificates
         const { data: certificates } = await supabase
           .from('certificates')
@@ -97,7 +153,10 @@ export const useAuth = (): AuthState => {
           portfolioUrl: data.portfolio_url,
           personalityType: data.personality_type,
           studyHours: data.study_hours,
-          weeklyGoal: data.weekly_goal
+          weeklyGoal: data.weekly_goal,
+          squad: data.squad,
+          followers: data.followers,
+          following: data.following
         };
 
         setUser(userProfile);
@@ -111,68 +170,57 @@ export const useAuth = (): AuthState => {
 
   const signUp = async (email: string, password: string, userData: Partial<User>) => {
     try {
+      setLoading(true);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            name: userData.name,
+            language: userData.language || 'en'
+          }
+        }
       });
 
       if (error) {
+        setLoading(false);
         return { error: error.message };
       }
 
-      if (data.user) {
-        // Create or update user profile using upsert to handle duplicate keys
-        const { error: profileError } = await supabase
-          .from('users')
-          .upsert({
-            id: data.user.id,
-            email: data.user.email!,
-            name: userData.name || '',
-            language: userData.language || 'en',
-            level: 1,
-            xp: 0,
-            total_xp: 0,
-            streak: 0,
-            completed_lessons: 0,
-            joined_at: new Date().toISOString(),
-            country: userData.country,
-            learning_style: userData.learningStyle,
-            time_commitment: userData.timeCommitment,
-            github_url: userData.githubUrl,
-            portfolio_url: userData.portfolioUrl,
-            personality_type: userData.personalityType,
-            study_hours: userData.studyHours || 0,
-            weekly_goal: userData.weeklyGoal || 10,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'id'
-          });
-
-        if (profileError) {
-          return { error: profileError.message };
-        }
+      if (data.user && !data.session) {
+        setLoading(false);
+        return { error: 'Please check your email to confirm your account.' };
       }
 
+      // The user profile will be created by the database trigger
+      // and fetchUserProfile will be called by the auth state change listener
+      
       return {};
     } catch (error) {
+      setLoading(false);
       return { error: 'An unexpected error occurred' };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
+      setLoading(true);
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        setLoading(false);
         return { error: error.message };
       }
 
+      // fetchUserProfile will be called by the auth state change listener
       return {};
     } catch (error) {
+      setLoading(false);
       return { error: 'An unexpected error occurred' };
     }
   };
