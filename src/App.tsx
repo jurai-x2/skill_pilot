@@ -19,7 +19,7 @@ import AuthModal from './components/Auth/AuthModal';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { QuizResult, Lesson, Project } from './types';
 import { useAuth } from './hooks/useAuth';
-import { db } from './lib/supabase';
+import { db, isSupabaseConfigured } from './lib/supabase';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -43,6 +43,9 @@ function App() {
   const [theme, setTheme] = useState<Theme>('system');
   
   const { user, loading, error: authError } = useAuth();
+
+  // Check if Supabase is configured first
+  const supabaseConfigured = isSupabaseConfigured();
 
   // Theme management
   useEffect(() => {
@@ -120,7 +123,7 @@ function App() {
   // Load user's latest quiz result
   useEffect(() => {
     const loadQuizResult = async () => {
-      if (user) {
+      if (user && supabaseConfigured) {
         try {
           const { data } = await db.getQuizResults(user.id);
           if (data && data.length > 0) {
@@ -145,7 +148,7 @@ function App() {
     };
 
     loadQuizResult();
-  }, [user]);
+  }, [user, supabaseConfigured]);
 
   // Session timeout management
   useEffect(() => {
@@ -156,7 +159,7 @@ function App() {
       clearTimeout(timeoutId);
       clearTimeout(warningTimeoutId);
       
-      if (user) {
+      if (user && supabaseConfigured) {
         // Warn user 5 minutes before timeout
         warningTimeoutId = setTimeout(() => {
           const shouldContinue = confirm(
@@ -195,7 +198,7 @@ function App() {
         document.removeEventListener(event, handleActivity, true);
       });
     };
-  }, [user]);
+  }, [user, supabaseConfigured]);
 
   // Mock lesson for micro-learning demo
   const mockLesson: Lesson = {
@@ -230,6 +233,10 @@ function App() {
   };
 
   const handleStartQuiz = () => {
+    if (!supabaseConfigured) {
+      alert('Please configure Supabase to use the quiz feature.');
+      return;
+    }
     if (!user) {
       setAuthMessage('Please log in or sign up to take the career quiz and save your results.');
       setAuthModalMode('signup');
@@ -240,7 +247,7 @@ function App() {
   };
 
   const handleQuizComplete = async (result: QuizResult) => {
-    if (user) {
+    if (user && supabaseConfigured) {
       // Save quiz result to database
       try {
         await db.saveQuizResult(user.id, result);
@@ -253,6 +260,10 @@ function App() {
   };
 
   const handleViewRoadmap = () => {
+    if (!supabaseConfigured) {
+      alert('Please configure Supabase to access the roadmap feature.');
+      return;
+    }
     if (!user) {
       setAuthMessage('Please sign in to access your personalized learning roadmap.');
       setAuthModalMode('signin');
@@ -265,11 +276,17 @@ function App() {
   const handleViewChange = (view: string) => {
     // Check if user needs to be authenticated for protected views
     const protectedViews = ['dashboard', 'roadmap'];
-    if (protectedViews.includes(view) && !user) {
-      setAuthMessage('Please sign in to access this feature.');
-      setAuthModalMode('signin');
-      setShowAuthModal(true);
-      return;
+    if (protectedViews.includes(view)) {
+      if (!supabaseConfigured) {
+        alert('Please configure Supabase to access this feature.');
+        return;
+      }
+      if (!user) {
+        setAuthMessage('Please sign in to access this feature.');
+        setAuthModalMode('signin');
+        setShowAuthModal(true);
+        return;
+      }
     }
     setCurrentView(view);
   };
@@ -287,6 +304,10 @@ function App() {
   };
 
   const openAuthModal = (mode: 'signin' | 'signup', message?: string) => {
+    if (!supabaseConfigured) {
+      alert('Please configure Supabase to use authentication features.');
+      return;
+    }
     setAuthModalMode(mode);
     setAuthMessage(message || '');
     setShowAuthModal(true);
@@ -300,13 +321,15 @@ function App() {
   // Prevent direct URL access to protected routes
   useEffect(() => {
     const protectedViews = ['dashboard', 'roadmap'];
-    if (protectedViews.includes(currentView) && !user && !loading) {
+    if (protectedViews.includes(currentView) && (!user || !supabaseConfigured) && !loading) {
       setCurrentView('home');
-      setAuthMessage('Please sign in to access this feature.');
-      setAuthModalMode('signin');
-      setShowAuthModal(true);
+      if (supabaseConfigured) {
+        setAuthMessage('Please sign in to access this feature.');
+        setAuthModalMode('signin');
+        setShowAuthModal(true);
+      }
     }
-  }, [currentView, user, loading]);
+  }, [currentView, user, loading, supabaseConfigured]);
 
   const renderCurrentView = () => {
     switch (currentView) {
@@ -345,30 +368,94 @@ function App() {
     }
   };
 
+  // Show configuration error screen if Supabase is not configured
+  if (!supabaseConfigured) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="text-center max-w-2xl mx-auto">
+          <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Supabase Configuration Required</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-8 text-lg">
+            To use SkillPilot's authentication and data features, you need to set up Supabase.
+          </p>
+          
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 text-left mb-8">
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-4 text-xl">Quick Setup Guide:</h3>
+            <ol className="space-y-3 text-gray-700 dark:text-gray-300">
+              <li className="flex items-start space-x-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</span>
+                <div>
+                  <strong>Create a Supabase project:</strong>
+                  <br />
+                  <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+                    Go to supabase.com
+                  </a> and create a new project
+                </div>
+              </li>
+              <li className="flex items-start space-x-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</span>
+                <div>
+                  <strong>Get your credentials:</strong>
+                  <br />
+                  Go to Settings → API and copy your Project URL and anon public key
+                </div>
+              </li>
+              <li className="flex items-start space-x-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-bold">3</span>
+                <div>
+                  <strong>Update your .env file:</strong>
+                  <div className="mt-2 p-3 bg-gray-900 dark:bg-gray-700 rounded-lg">
+                    <code className="text-green-400 text-sm">
+                      VITE_SUPABASE_URL=https://your-project-ref.supabase.co<br/>
+                      VITE_SUPABASE_ANON_KEY=your-anon-key-here
+                    </code>
+                  </div>
+                </div>
+              </li>
+              <li className="flex items-start space-x-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-bold">4</span>
+                <div>
+                  <strong>Restart the development server</strong>
+                  <br />
+                  The database tables will be created automatically
+                </div>
+              </li>
+            </ol>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+            <p className="text-blue-800 dark:text-blue-200 text-sm">
+              <strong>Note:</strong> All database migrations are included and will run automatically when you connect to Supabase.
+              No additional setup is required!
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Show error screen if authentication fails
   if (authError) {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
+      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="text-center max-w-md mx-auto">
           <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Configuration Error</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Authentication Error</h2>
           <p className="text-gray-600 dark:text-gray-400 mb-6">{authError}</p>
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-left">
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">To fix this:</h3>
-            <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-              <li>1. Create a Supabase project at <a href="https://supabase.com" className="text-primary-600 hover:underline">supabase.com</a></li>
-              <li>2. Copy your project URL and anon key</li>
-              <li>3. Add them to your .env file as:</li>
-              <li className="font-mono text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded mt-2">
-                VITE_SUPABASE_URL=your-project-url<br/>
-                VITE_SUPABASE_ANON_KEY=your-anon-key
-              </li>
-            </ol>
-          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -410,12 +497,14 @@ function App() {
       {renderCurrentView()}
       
       {/* Modals and Overlays */}
-      <AuthModal 
-        isOpen={showAuthModal}
-        onClose={closeAuthModal}
-        initialMode={authModalMode}
-        message={authMessage}
-      />
+      {supabaseConfigured && (
+        <AuthModal 
+          isOpen={showAuthModal}
+          onClose={closeAuthModal}
+          initialMode={authModalMode}
+          message={authMessage}
+        />
+      )}
       
       <AIMentor 
         isOpen={showAIMentor} 
