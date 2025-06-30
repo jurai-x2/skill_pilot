@@ -15,13 +15,19 @@ import LiveEvents from './components/LiveEvents';
 import LearningFeed from './components/LearningFeed';
 import Gamification from './components/Gamification';
 import PersonalizedVideos from './components/PersonalizedVideos';
-import { QuizResult, User, Lesson, Project } from './types';
+import AuthModal from './components/Auth/AuthModal';
+import ProtectedRoute from './components/Auth/ProtectedRoute';
+import { QuizResult, Lesson, Project } from './types';
+import { useAuth } from './hooks/useAuth';
+import { db } from './lib/supabase';
 
 type Theme = 'light' | 'dark' | 'system';
 
 function App() {
   const [currentView, setCurrentView] = useState<string>('home');
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
   const [showAIMentor, setShowAIMentor] = useState(false);
   const [showResumeBuilder, setShowResumeBuilder] = useState(false);
   const [showCommunityForum, setShowCommunityForum] = useState(false);
@@ -35,38 +41,7 @@ function App() {
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [theme, setTheme] = useState<Theme>('system');
   
-  // Mock user data - in real app, this would come from authentication
-  const [user] = useState<User>({
-    id: '1',
-    name: 'Alex Chen',
-    email: 'alex@example.com',
-    careerPath: 'Frontend Developer',
-    level: 3,
-    xp: 150,
-    totalXp: 450,
-    streak: 5,
-    completedLessons: 12,
-    certificates: [
-      {
-        id: '1',
-        name: 'HTML/CSS Fundamentals',
-        careerTrack: 'Frontend Developer',
-        issuedAt: new Date('2024-01-15'),
-        projectUrl: 'https://github.com/alexchen/portfolio',
-        uniqueId: 'CERT-001-2024',
-        verified: true,
-        skills: ['HTML', 'CSS', 'Responsive Design']
-      }
-    ],
-    joinedAt: new Date('2024-01-01'),
-    language: currentLanguage,
-    country: 'United States',
-    githubUrl: 'https://github.com/alexchen',
-    portfolioUrl: 'https://alexchen.dev',
-    personalityType: 'Creative Problem Solver',
-    studyHours: 45,
-    weeklyGoal: 10
-  });
+  const { user, loading } = useAuth();
 
   // Theme management
   useEffect(() => {
@@ -141,6 +116,32 @@ function App() {
     };
   }, []);
 
+  // Load user's latest quiz result
+  useEffect(() => {
+    const loadQuizResult = async () => {
+      if (user) {
+        const { data } = await db.getQuizResults(user.id);
+        if (data && data.length > 0) {
+          const latestResult = data[0];
+          setQuizResult({
+            careerPath: latestResult.career_path,
+            confidence: latestResult.confidence,
+            description: latestResult.description,
+            skills: latestResult.skills,
+            nextSteps: latestResult.next_steps,
+            personalityType: latestResult.personality_type,
+            learningStyle: latestResult.learning_style,
+            alternativePaths: latestResult.alternative_paths,
+            riasecProfile: latestResult.riasec_profile,
+            bigFiveTraits: latestResult.big_five_traits as Record<string, number>
+          });
+        }
+      }
+    };
+
+    loadQuizResult();
+  }, [user]);
+
   // Mock lesson for micro-learning demo
   const mockLesson: Lesson = {
     id: '1',
@@ -174,16 +175,41 @@ function App() {
   };
 
   const handleStartQuiz = () => {
+    if (!user) {
+      setAuthModalMode('signup');
+      setShowAuthModal(true);
+      return;
+    }
     setCurrentView('quiz');
   };
 
-  const handleQuizComplete = (result: QuizResult) => {
+  const handleQuizComplete = async (result: QuizResult) => {
+    if (user) {
+      // Save quiz result to database
+      await db.saveQuizResult(user.id, result);
+    }
     setQuizResult(result);
     setCurrentView('results');
   };
 
   const handleViewRoadmap = () => {
+    if (!user) {
+      setAuthModalMode('signin');
+      setShowAuthModal(true);
+      return;
+    }
     setCurrentView('roadmap');
+  };
+
+  const handleViewChange = (view: string) => {
+    // Check if user needs to be authenticated for protected views
+    const protectedViews = ['dashboard', 'roadmap', 'quiz'];
+    if (protectedViews.includes(view) && !user) {
+      setAuthModalMode('signin');
+      setShowAuthModal(true);
+      return;
+    }
+    setCurrentView(view);
   };
 
   const handleLessonComplete = (xpEarned: number) => {
@@ -198,12 +224,21 @@ function App() {
     setShowProjectSubmission(false);
   };
 
+  const openAuthModal = (mode: 'signin' | 'signup') => {
+    setAuthModalMode(mode);
+    setShowAuthModal(true);
+  };
+
   const renderCurrentView = () => {
     switch (currentView) {
       case 'home':
         return <LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />;
       case 'quiz':
-        return <CareerQuiz onComplete={handleQuizComplete} currentLanguage={currentLanguage} />;
+        return (
+          <ProtectedRoute fallback={<LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />}>
+            <CareerQuiz onComplete={handleQuizComplete} currentLanguage={currentLanguage} />
+          </ProtectedRoute>
+        );
       case 'results':
         return quizResult ? (
           <QuizResults 
@@ -213,19 +248,38 @@ function App() {
           />
         ) : null;
       case 'dashboard':
-        return <Dashboard user={user} onViewRoadmap={handleViewRoadmap} currentLanguage={currentLanguage} />;
+        return (
+          <ProtectedRoute>
+            {user && <Dashboard user={user} onViewRoadmap={handleViewRoadmap} currentLanguage={currentLanguage} />}
+          </ProtectedRoute>
+        );
       case 'roadmap':
-        return <Roadmap careerPath={quizResult?.careerPath || user.careerPath || 'Frontend Developer'} currentLanguage={currentLanguage} />;
+        return (
+          <ProtectedRoute>
+            <Roadmap careerPath={quizResult?.careerPath || user?.careerPath || 'Frontend Developer'} currentLanguage={currentLanguage} />
+          </ProtectedRoute>
+        );
       default:
         return <LandingPage onStartQuiz={handleStartQuiz} currentLanguage={currentLanguage} />;
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading SkillPilot...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
       <Header 
         currentView={currentView} 
-        onViewChange={setCurrentView}
+        onViewChange={handleViewChange}
         onOpenAIMentor={() => setShowAIMentor(true)}
         onOpenResumeBuilder={() => setShowResumeBuilder(true)}
         onOpenCommunityForum={() => setShowCommunityForum(true)}
@@ -239,18 +293,26 @@ function App() {
         currentTheme={theme}
         onThemeChange={setTheme}
         currentLanguage={currentLanguage}
+        user={user}
+        onAuthClick={openAuthModal}
       />
 
       {renderCurrentView()}
       
       {/* Modals and Overlays */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode={authModalMode}
+      />
+      
       <AIMentor 
         isOpen={showAIMentor} 
         onClose={() => setShowAIMentor(false)}
         currentLanguage={currentLanguage}
       />
       
-      {showResumeBuilder && (
+      {showResumeBuilder && user && (
         <ResumeBuilder 
           user={user}
           onClose={() => setShowResumeBuilder(false)}
@@ -265,7 +327,7 @@ function App() {
       />
       
       <MonetizationGuide 
-        careerPath={user.careerPath || 'Frontend Developer'}
+        careerPath={user?.careerPath || 'Frontend Developer'}
         isOpen={showMonetizationGuide}
         onClose={() => setShowMonetizationGuide(false)}
         currentLanguage={currentLanguage}
@@ -301,19 +363,23 @@ function App() {
         currentLanguage={currentLanguage}
       />
 
-      <Gamification
-        user={user}
-        isOpen={showGamification}
-        onClose={() => setShowGamification(false)}
-        currentLanguage={currentLanguage}
-      />
+      {user && (
+        <Gamification
+          user={user}
+          isOpen={showGamification}
+          onClose={() => setShowGamification(false)}
+          currentLanguage={currentLanguage}
+        />
+      )}
 
-      <PersonalizedVideos
-        user={user}
-        isOpen={showPersonalizedVideos}
-        onClose={() => setShowPersonalizedVideos(false)}
-        currentLanguage={currentLanguage}
-      />
+      {user && (
+        <PersonalizedVideos
+          user={user}
+          isOpen={showPersonalizedVideos}
+          onClose={() => setShowPersonalizedVideos(false)}
+          currentLanguage={currentLanguage}
+        />
+      )}
     </div>
   );
 }

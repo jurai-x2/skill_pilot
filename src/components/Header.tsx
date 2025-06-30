@@ -1,9 +1,11 @@
 import React from 'react';
-import { Brain, User, Menu, X, MessageCircle, FileText, Users, DollarSign, BookOpen, Upload, Calendar, Play, Trophy, Video, ChevronDown, Sparkles, Zap, Globe } from 'lucide-react';
+import { Brain, User, Menu, X, MessageCircle, FileText, Users, DollarSign, BookOpen, Upload, Calendar, Play, Trophy, Video, ChevronDown, Sparkles, Zap, Globe, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSelector from './LanguageSelector';
 import { useTranslation } from '../utils/translations';
+import { useAuth } from '../hooks/useAuth';
+import { User as UserType } from '../types';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -23,6 +25,8 @@ interface HeaderProps {
   currentTheme: Theme;
   onThemeChange: (theme: Theme) => void;
   currentLanguage: string;
+  user?: UserType | null;
+  onAuthClick: (mode: 'signin' | 'signup') => void;
 }
 
 export default function Header({ 
@@ -40,13 +44,17 @@ export default function Header({
   onOpenPersonalizedVideos,
   currentTheme,
   onThemeChange,
-  currentLanguage
+  currentLanguage,
+  user,
+  onAuthClick
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [showToolsMenu, setShowToolsMenu] = React.useState(false);
   const [showLearningMenu, setShowLearningMenu] = React.useState(false);
+  const [showUserMenu, setShowUserMenu] = React.useState(false);
   
   const t = useTranslation(currentLanguage);
+  const { signOut } = useAuth();
 
   const navigation = [
     { name: t('header.home'), id: 'home', icon: Brain },
@@ -70,6 +78,12 @@ export default function Header({
     { name: t('tools.achievements'), icon: Trophy, action: onOpenGamification, color: 'from-yellow-500 to-amber-500', description: 'Track progress' },
     { name: t('tools.monetization'), icon: DollarSign, action: onOpenMonetizationGuide, color: 'from-emerald-500 to-green-500', description: 'Earn money' },
   ];
+
+  const handleSignOut = async () => {
+    await signOut();
+    setShowUserMenu(false);
+    onViewChange('home');
+  };
 
   return (
     <motion.header 
@@ -271,14 +285,75 @@ export default function Header({
               }}
             />
             <ThemeSwitcher currentTheme={currentTheme} onThemeChange={onThemeChange} />
-            <motion.button 
-              className="relative p-4 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 hover:from-primary-100 hover:to-secondary-100 dark:hover:from-primary-900/30 dark:hover:to-secondary-900/30 transition-all duration-300 shadow-lg hover:shadow-xl group"
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <User className="w-6 h-6 text-gray-600 dark:text-gray-300 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors" />
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full border-2 border-white dark:border-gray-800 shadow-lg" />
-            </motion.button>
+            
+            {user ? (
+              <div className="relative">
+                <motion.button 
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="relative p-4 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 hover:from-primary-100 hover:to-secondary-100 dark:hover:from-primary-900/30 dark:hover:to-secondary-900/30 transition-all duration-300 shadow-lg hover:shadow-xl group"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <User className="w-6 h-6 text-gray-600 dark:text-gray-300 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors" />
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full border-2 border-white dark:border-gray-800 shadow-lg" />
+                </motion.button>
+
+                <AnimatePresence>
+                  {showUserMenu && (
+                    <motion.div
+                      className="absolute top-full right-0 mt-3 w-64 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/40 p-3 overflow-hidden"
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <div className="p-4 border-b border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
+                            <span className="font-semibold text-primary-600 dark:text-primary-400">
+                              {user.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900 dark:text-white">{user.name}</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">{user.email}</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-2">
+                        <button
+                          onClick={handleSignOut}
+                          className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-3">
+                <motion.button 
+                  onClick={() => onAuthClick('signin')}
+                  className="px-6 py-3 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 font-medium transition-colors"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Sign In
+                </motion.button>
+                <motion.button 
+                  onClick={() => onAuthClick('signup')}
+                  className="px-6 py-3 bg-primary-600 text-white rounded-2xl font-medium hover:bg-primary-700 transition-colors shadow-lg hover:shadow-xl"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Get Started
+                </motion.button>
+              </div>
+            )}
           </div>
 
           {/* Enhanced Mobile menu button */}
@@ -435,14 +510,58 @@ export default function Header({
                         />
                         <ThemeSwitcher currentTheme={currentTheme} onThemeChange={onThemeChange} />
                       </div>
-                      <motion.button 
-                        className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 hover:from-primary-100 hover:to-secondary-100 dark:hover:from-primary-900/30 dark:hover:to-secondary-900/30 transition-all duration-300 shadow-lg"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <User className="w-6 h-6 text-gray-600 dark:text-gray-300" />
-                        <span className="font-semibold text-gray-700 dark:text-gray-300">Profile</span>
-                      </motion.button>
+                      
+                      {user ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-3 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-2xl">
+                            <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
+                              <span className="font-semibold text-primary-600 dark:text-primary-400">
+                                {user.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-gray-900 dark:text-white">{user.name}</div>
+                              <div className="text-sm text-gray-600 dark:text-gray-400">{user.email}</div>
+                            </div>
+                          </div>
+                          <motion.button 
+                            onClick={handleSignOut}
+                            className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-300"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <LogOut className="w-5 h-5" />
+                            <span className="font-semibold">Sign Out</span>
+                          </motion.button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <motion.button 
+                            onClick={() => {
+                              onAuthClick('signin');
+                              setIsMenuOpen(false);
+                            }}
+                            className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl border-2 border-primary-200 dark:border-primary-700 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all duration-300"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <User className="w-5 h-5" />
+                            <span className="font-semibold">Sign In</span>
+                          </motion.button>
+                          <motion.button 
+                            onClick={() => {
+                              onAuthClick('signup');
+                              setIsMenuOpen(false);
+                            }}
+                            className="w-full flex items-center justify-center space-x-3 p-4 rounded-2xl bg-primary-600 text-white hover:bg-primary-700 transition-all duration-300 shadow-lg"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <Sparkles className="w-5 h-5" />
+                            <span className="font-semibold">Get Started</span>
+                          </motion.button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
