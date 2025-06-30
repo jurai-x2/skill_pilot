@@ -217,13 +217,31 @@ function App() {
   };
 
   const handleViewChange = (view: string) => {
-    const protectedViews = ['dashboard', 'roadmap'];
+    // Define which views require authentication
+    const protectedViews = ['dashboard', 'roadmap', 'quiz'];
+    
     if (protectedViews.includes(view) && !user) {
-      setAuthMessage('Please sign in to access this feature.');
-      setAuthModalMode('signin');
+      // Set appropriate message based on the view
+      let message = 'Please sign in to access this feature.';
+      let mode: 'signin' | 'signup' = 'signin';
+      
+      if (view === 'quiz') {
+        message = 'Create your free account to take the career quiz and get personalized learning paths!';
+        mode = 'signup';
+      } else if (view === 'dashboard') {
+        message = 'Please sign in to access your personalized dashboard.';
+        mode = 'signin';
+      } else if (view === 'roadmap') {
+        message = 'Please sign in to access your personalized learning roadmap.';
+        mode = 'signin';
+      }
+      
+      setAuthMessage(message);
+      setAuthModalMode(mode);
       setShowAuthModal(true);
       return;
     }
+    
     setCurrentView(view);
   };
 
@@ -252,11 +270,27 @@ function App() {
 
   // Prevent direct URL access to protected routes
   useEffect(() => {
-    const protectedViews = ['dashboard', 'roadmap'];
+    const protectedViews = ['dashboard', 'roadmap', 'quiz'];
     if (protectedViews.includes(currentView) && !user && !loading) {
       setCurrentView('home');
-      setAuthMessage('Please sign in to access this feature.');
-      setAuthModalMode('signin');
+      
+      // Set appropriate message based on the view
+      let message = 'Please sign in to access this feature.';
+      let mode: 'signin' | 'signup' = 'signin';
+      
+      if (currentView === 'quiz') {
+        message = 'Create your free account to take the career quiz and get personalized learning paths!';
+        mode = 'signup';
+      } else if (currentView === 'dashboard') {
+        message = 'Please sign in to access your personalized dashboard.';
+        mode = 'signin';
+      } else if (currentView === 'roadmap') {
+        message = 'Please sign in to access your personalized learning roadmap.';
+        mode = 'signin';
+      }
+      
+      setAuthMessage(message);
+      setAuthModalMode(mode);
       setShowAuthModal(true);
     }
   }, [currentView, user, loading]);
@@ -290,7 +324,7 @@ function App() {
       case 'roadmap':
         return (
           <ProtectedRoute>
-            <Roadmap careerPath={quizResult?.careerPath || user?.career_path || 'Frontend Developer'} currentLanguage={currentLanguage} />
+            <Roadmap careerPath={quizResult?.careerPath || user?.careerPath || 'Frontend Developer'} currentLanguage={currentLanguage} />
           </ProtectedRoute>
         );
       default:
@@ -389,7 +423,7 @@ function App() {
       />
       
       <MonetizationGuide 
-        careerPath={user?.career_path || 'Frontend Developer'}
+        careerPath={user?.careerPath || 'Frontend Developer'}
         isOpen={showMonetizationGuide}
         onClose={() => setShowMonetizationGuide(false)}
         currentLanguage={currentLanguage}
