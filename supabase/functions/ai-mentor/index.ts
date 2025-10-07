@@ -1,21 +1,21 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-client-info, apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 };
 
-const PICA_SECRET_KEY = Deno.env.get("PICA_SECRET_KEY");
+const PICA_SECRET_KEY = Deno.env.get("PICA_SECRET_KEY") || Deno.env.get("VITE_PICA_API_KEY");
 const PICA_OPENAI_CONNECTION_KEY = Deno.env.get("PICA_OPENAI_CONNECTION_KEY");
 
 if (!PICA_SECRET_KEY || !PICA_OPENAI_CONNECTION_KEY) {
   console.error("❌ Missing PICA_SECRET_KEY or PICA_OPENAI_CONNECTION_KEY in environment.");
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
